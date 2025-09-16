@@ -1,0 +1,11 @@
+[database]
+  dsn = "host=localhost user=gebetamap password=gebetamap dbname=openstreetmap port=5432 sslmode=disable"
+  db = "postgres"
+
+[generator]
+  out_path = "./src/db/generated/gorm"
+  only_model = true
+  with_unit_test = false
+  field_nullable = true
+  field_with_index_tag = true
+  field_with_type_tag = true

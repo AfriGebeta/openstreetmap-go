@@ -2,15 +2,15 @@ package v1
 
 import "encoding/xml"
 
-type Osm struct {
+type CapabilityResponse struct {
 	XMLName     xml.Name `xml:"osm"`
-	Version     string   `xml:"version,attr"`
 	Generator   string   `xml:"generator,attr"`
+	Version     string   `xml:"version,attr"`
 	Copyright   string   `xml:"copyright,attr"`
 	Attribution string   `xml:"attribution,attr"`
 	License     string   `xml:"license,attr"`
 	API         API      `xml:"api"`
-	Policy      []Policy `xml:"policy"`
+	Policy      Policy   `xml:"policy"`
 }
 
 type API struct {
@@ -18,8 +18,8 @@ type API struct {
 	Area            Area            `xml:"area"`
 	NoteArea        NoteArea        `xml:"note_area"`
 	Tracepoints     Tracepoints     `xml:"tracepoints"`
-	WayNodes        WayNodes        `xml:"waynodes"`
-	RelationMembers RelationMembers `xml:"relationmembers"`
+	Waynodes        Waynodes        `xml:"waynodes"`
+	Relationmembers Relationmembers `xml:"relationmembers"`
 	Changesets      Changesets      `xml:"changesets"`
 	Notes           Notes           `xml:"notes"`
 	Timeout         Timeout         `xml:"timeout"`
@@ -32,38 +32,38 @@ type Version struct {
 }
 
 type Area struct {
-	Maximum float32 `xml:"maximum,attr"`
+	Maximum string `xml:"maximum,attr"`
 }
 
 type NoteArea struct {
-	Maximum float32 `xml:"maximum,attr"`
+	Maximum string `xml:"maximum,attr"`
 }
 
 type Tracepoints struct {
-	PerPage int32 `xml:"per_page,attr"`
+	PerPage string `xml:"per_page,attr"`
 }
 
-type WayNodes struct {
-	Maximum uint32 `xml:"maximum,attr"`
+type Waynodes struct {
+	Maximum string `xml:"maximum,attr"`
 }
 
-type RelationMembers struct {
-	Maximum uint32 `xml:"maximum,attr"`
+type Relationmembers struct {
+	Maximum string `xml:"maximum,attr"`
 }
 
 type Changesets struct {
 	MaximumElements   string `xml:"maximum_elements,attr"`
-	DefaultQueryLimit int32  `xml:"default_query_limit,attr"`
-	MaximumQueryLimit int32  `xml:"maximum_query_limit,attr"`
+	DefaultQueryLimit string `xml:"default_query_limit,attr"`
+	MaximumQueryLimit string `xml:"maximum_query_limit,attr"`
 }
 
 type Notes struct {
-	DefaultQueryLimit int32 `xml:"default_query_limit,attr"`
-	MaximumQueryLimit int32 `xml:"maximum_query_limit,attr"`
+	DefaultQueryLimit string `xml:"default_query_limit,attr"`
+	MaximumQueryLimit string `xml:"maximum_query_limit,attr"`
 }
 
 type Timeout struct {
-	Seconds int32 `xml:"seconds,attr"`
+	Seconds string `xml:"seconds,attr"`
 }
 
 type Status struct {

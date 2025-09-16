@@ -1,198 +1,203 @@
 package config
 
 import (
-	"errors"
+	"flag"
+	"fmt"
 	"github.com/joho/godotenv"
-	"gopkg.in/yaml.v3"
-	"log"
+	"gopkg.in/yaml.v2"
+	"openstreetmap-go/src/utils"
 	"os"
-	"path"
 	"strconv"
+	"strings"
 )
 
-var config ServerConfig
+func Load(configObject *ServerConfig) {
+	LoadArgs(configObject)
 
-func SetupEnv() {
-	SetupConfigurationFromEnv()
-	SetupConfigurationFromYaml()
+	utils.LogInfo("config", "version is "+utils.GreyString(Version))
+
+	if CommitHash != "" {
+		utils.LogInfo("config", "head is "+utils.GreyString(CommitHash))
+	}
+
+	LoadEnvFile(configObject)
+	LoadYmlFile(configObject)
 }
 
-func SetupConfigurationFromEnv() {
+func LoadArgs(configObject *ServerConfig) {
+	var (
+		port = flag.Int("port", 0, "Port number to use")
+		p    = flag.Int("p", 0, "Port number (shorthand)")
 
-	if envLoadErr := godotenv.Load(); envLoadErr != nil {
-		panic("could not load .env file")
-	}
-	if dbHost := os.Getenv("DB_HOST"); dbHost != "" {
-		ServerConfiguration.DBHost = dbHost
-	} else {
-		panic(errors.New("DB_HOST environment variable not set"))
-	}
-	if dbUsername := os.Getenv("DB_USERNAME"); dbUsername != "" {
-		ServerConfiguration.DBUserName = dbUsername
-	} else {
-		panic(errors.New("DB_USERNAME environment variable not set"))
-	}
-	if dbPassword := os.Getenv("DB_PASSWORD"); dbPassword != "" {
-		ServerConfiguration.DBPassword = dbPassword
-	} else {
-		panic(errors.New("DB_PASSWORD environment variable not set"))
+		env = flag.String("env", "local", "Environment to use")
+		e   = flag.String("e", "local", "Environment to use (shorthand)")
+
+		version = flag.Bool("version", false, "Print version")
+		v       = flag.Bool("v", false, "Print version (shorthand)")
+
+		help = flag.Bool("help", false, "Print help")
+		h    = flag.Bool("h", false, "Print help (shorthand)")
+
+		commitHash = flag.Bool("commit-hash", false, "Commit hash")
+		c          = flag.Bool("c", false, "Commit hash (shorthand)")
+	)
+
+	flag.Parse()
+
+	if (help != nil && *help) || (h != nil && *h) {
+		flag.Usage()
+		os.Exit(0)
 	}
 
-	if dbPort := os.Getenv("DB_PORT"); dbPort != "" {
-		port, err := strconv.Atoi(dbPort)
-		if err != nil {
-			panic("Invalid DB_PORT")
+	if (version != nil && *version) || (v != nil && *v) {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
+
+	if (commitHash != nil && *commitHash) || (c != nil && *c) {
+		fmt.Println(CommitHash)
+		os.Exit(0)
+	}
+
+	if e != nil && *e != "" {
+		env = e
+	}
+
+	if *env != "" {
+		configObject.EnvFilePath = "deployment-files/" + *env + "/.env"
+	}
+
+	if p != nil && *p != 0 {
+		port = p
+	}
+
+	if *port != 0 {
+		configObject.Port = strconv.Itoa(*port)
+	}
+}
+
+func LoadEnvFile(configObject *ServerConfig) {
+	if envLoadErr := godotenv.Load(configObject.EnvFilePath); envLoadErr != nil {
+		if envLoadErr = godotenv.Load(); envLoadErr != nil {
+			utils.LogFatal("server", "could not load .env file: "+envLoadErr.Error())
 		}
-		ServerConfiguration.DBPort = port
-	} else {
-		panic(errors.New("DB_PORT environment variable not set"))
 	}
 
-	if dbName := os.Getenv("DB_NAME"); dbName != "" {
-		ServerConfiguration.DatabaseName = dbName
+	if env := os.Getenv("ENV"); env != "" {
+		configObject.Env = env
+		utils.LogInfo("server", "ENV: "+utils.GreyString(env))
 	} else {
-		panic(errors.New("DB_NAME environment variable not set"))
+		utils.LogWarn("server", "ENV not set in .env file: using "+utils.GreyString(configObject.Env))
 	}
 
+	if configObject.Port == "" {
+		if port := os.Getenv("PORT"); port != "" {
+			configObject.Port = port
+			utils.LogInfo("server", "PORT: "+utils.GreyString(port))
+		} else {
+			utils.LogWarn("server", "PORT not set in .env file: using "+utils.GreyString(configObject.Port))
+		}
+	}
+
+	if dbUrl := os.Getenv("PRIMARY_DB_URL"); dbUrl != "" {
+		configObject.PrimaryDbUrl = dbUrl
+	} else {
+		utils.LogFatal("server", "DB_URL not set in .env file")
+	}
+
+	if secondaryDbUrls := os.Getenv("REPLICA_DB_URLS"); secondaryDbUrls != "" {
+		var tmp []string
+
+		for _, item := range strings.Split(secondaryDbUrls, ",") {
+			tmp = append(tmp, item)
+		}
+
+		configObject.ReplicaDbUrls = tmp
+	} else {
+		utils.LogWarn("server", "SECONDARY_DB_URLS not set in .env file")
+	}
+
+	if cacheUrl := os.Getenv("CACHE_URL"); cacheUrl != "" {
+		configObject.CacheUrl = cacheUrl
+	} else {
+		utils.LogFatal("server", "CACHE_URL not set in .env file")
+	}
+
+	if cachePassword := os.Getenv("CACHE_PASSWORD"); cachePassword != "" {
+		configObject.CachePassword = cachePassword
+	} else {
+		utils.LogWarn("server", "CACHE_PASSWORD not set in .env file")
+	}
+
+	if cacheDatabase := os.Getenv("CACHE_DATABASE"); cacheDatabase != "" {
+		if value, err := strconv.Atoi(cacheDatabase); err == nil {
+			configObject.CacheDatabase = value
+		} else {
+			utils.LogWarn("server", "could not parse CACHE_DATABASE from .env file")
+		}
+	} else {
+		utils.LogWarn("server", "CACHE_DATABASE not set in .env file")
+	}
+
+	if cacheSystemPrefix := os.Getenv("CACHE_SYSTEM_PREFIX"); cacheSystemPrefix != "" {
+		configObject.CacheSystemPrefix = cacheSystemPrefix
+	} else {
+		utils.LogWarn("server", "CACHE_SYSTEM_PREFIX not set in .env file")
+	}
+
+	if allowedOrigins := os.Getenv("ALLOWED_ORIGINS"); allowedOrigins != "" {
+		var split = strings.Split(allowedOrigins, ";")
+
+		for i, origin := range split {
+			split[i] = strings.TrimSpace(origin)
+		}
+
+		if len(split) == 0 {
+			utils.LogFatal("server", "ALLOWED_ORIGINS not set in .env file")
+		}
+
+		ServerConfigObject.AllowedOrigins = split
+	} else {
+		utils.LogFatal("server", "ALLOWED_ORIGINS not set in .env file")
+	}
+
+	if selfBaseUrl := os.Getenv("SELF_BASE_URL"); selfBaseUrl != "" {
+		ServerConfigObject.SelfBaseUrl = selfBaseUrl
+	} else {
+		utils.LogFatal("server", "SELF_BASE_URL not found in .env")
+	}
+	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
+		configObject.JwtSecret = jwtSecret
+	} else {
+		utils.LogFatal("server", "JWT_SECRET not set in .env file")
+	}
+
+	if secretKeybase := os.Getenv("SECRET_KEY_BASE"); secretKeybase != "" {
+		configObject.SecretKeyBase = secretKeybase
+	} else {
+		utils.LogFatal("server", "SECRET_KEY_BASE not set in .env file")
+	}
 }
 
-// read from yaml
-func SetupConfigurationFromYaml() {
-	getwd, err := os.Getwd()
+func LoadYmlFile(configObject *ServerConfig) {
+	currentDir, err := os.Getwd()
 	if err != nil {
-		return
-	}
-	ymlPath := path.Join(getwd, "/src/config/settings.yml")
-	f, err := os.Open(ymlPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	decoder := yaml.NewDecoder(f)
-	err = decoder.Decode(&config)
-	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal("server", "could not get current directory")
 	}
 
-	ServerConfiguration.ServerProtocol = config.ServerProtocol
-	ServerConfiguration.ServerUrl = config.ServerUrl
-	ServerConfiguration.Generator = config.Generator
-	ServerConfiguration.CopyrightOwner = config.CopyrightOwner
-	ServerConfiguration.AttributionUrl = config.AttributionUrl
-	ServerConfiguration.LicenseUrl = config.LicenseUrl
-	ServerConfiguration.SupportEmail = config.SupportEmail
-	ServerConfiguration.EmailFrom = config.EmailFrom
-	ServerConfiguration.EmailReturnPath = config.EmailReturnPath
-	ServerConfiguration.ApiVersion = config.ApiVersion
-	ServerConfiguration.Status = config.Status
-	ServerConfiguration.MaxRequestArea = config.MaxRequestArea
-	ServerConfiguration.TracepointsPerPage = config.TracepointsPerPage
-	ServerConfiguration.DefaultChangesetQueryLimit = config.DefaultChangesetQueryLimit
-	ServerConfiguration.MaxChangesetQueryLimit = config.MaxChangesetQueryLimit
-	ServerConfiguration.DefaultChangesetCommentQueryLimit = config.DefaultChangesetCommentQueryLimit
-	ServerConfiguration.MaxChangesetCommentQueryLimit = config.MaxChangesetCommentQueryLimit
-	ServerConfiguration.DefaultChangesetCommentsFeedQueryLimit = config.DefaultChangesetCommentsFeedQueryLimit
-	ServerConfiguration.MaxChangesetCommentsFeedQueryLimit = config.MaxChangesetCommentsFeedQueryLimit
-	ServerConfiguration.MaxNumberOfNodes = config.MaxNumberOfNodes
-	ServerConfiguration.MaxNumberOfWayNodes = config.MaxNumberOfWayNodes
-	ServerConfiguration.MaxNumberOfRelationMembers = config.MaxNumberOfRelationMembers
-	ServerConfiguration.MaxNoteRequestArea = config.MaxNoteRequestArea
-	ServerConfiguration.DefaultNoteQueryLimit = config.DefaultNoteQueryLimit
-	ServerConfiguration.MaxNoteQueryLimit = config.MaxNoteQueryLimit
-	ServerConfiguration.MaxIssuesCount = config.MaxIssuesCount
-	ServerConfiguration.MaxTraceSize = config.MaxTraceSize
-	ServerConfiguration.PostcodeZoom = config.PostcodeZoom
-	ServerConfiguration.ApiTimeout = config.ApiTimeout
-	ServerConfiguration.WebTimeout = config.WebTimeout
-	ServerConfiguration.UserBlockPeriods = config.UserBlockPeriods
-	ServerConfiguration.UserAccountDeletionDelay = config.UserAccountDeletionDelay
-	ServerConfiguration.MaxMessagesPerHour = config.MaxMessagesPerHour
-	ServerConfiguration.DefaultMessageQueryLimit = config.DefaultMessageQueryLimit
-	ServerConfiguration.MaxMessageQueryLimit = config.MaxMessageQueryLimit
-	ServerConfiguration.MaxFollowsPerHour = config.MaxFollowsPerHour
-	ServerConfiguration.MinChangesetCommentsPerHour = config.MinChangesetCommentsPerHour
-	ServerConfiguration.InitialChangesetCommentsPerHour = config.InitialChangesetCommentsPerHour
-	ServerConfiguration.MaxChangesetCommentsPerHour = config.MaxChangesetCommentsPerHour
-	ServerConfiguration.CommentsToMaxChangesetComments = config.CommentsToMaxChangesetComments
-	ServerConfiguration.ModeratorChangesetCommentsPerHour = config.ModeratorChangesetCommentsPerHour
-	ServerConfiguration.MinChangesPerHour = config.MinChangesPerHour
-	ServerConfiguration.InitialChangesPerHour = config.InitialChangesPerHour
-	ServerConfiguration.MaxChangesPerHour = config.MaxChangesPerHour
-	ServerConfiguration.DaysToMaxChanges = config.DaysToMaxChanges
-	ServerConfiguration.ImporterChangesPerHour = config.ImporterChangesPerHour
-	ServerConfiguration.ModeratorChangesPerHour = config.ModeratorChangesPerHour
-	ServerConfiguration.MinSizeLimit = config.MinSizeLimit
-	ServerConfiguration.InitialSizeLimit = config.InitialSizeLimit
-	ServerConfiguration.MaxSizeLimit = config.MaxSizeLimit
-	ServerConfiguration.DaysToMaxSizeLimit = config.DaysToMaxSizeLimit
-	ServerConfiguration.ImporterSizeLimit = config.ImporterSizeLimit
-	ServerConfiguration.ModeratorSizeLimit = config.ModeratorSizeLimit
-	ServerConfiguration.MessagesDomain = config.MessagesDomain
-	ServerConfiguration.MaxmindDatabase = config.MaxmindDatabase
-	ServerConfiguration.NearbyUsers = config.NearbyUsers
-	ServerConfiguration.NearbyRadius = config.NearbyRadius
-	ServerConfiguration.SpamThreshold = config.SpamThreshold
-	ServerConfiguration.DiaryFeedDelay = config.DiaryFeedDelay
-	ServerConfiguration.DefaultLegale = config.DefaultLegale
-	ServerConfiguration.AttachmentsDir = config.AttachmentsDir
-	ServerConfiguration.LogPath = config.LogPath
-	ServerConfiguration.LogstashPath = config.LogstashPath
-	ServerConfiguration.MaptilerKey = config.MaptilerKey
-	ServerConfiguration.MemcacheServers = config.MemcacheServers
-	ServerConfiguration.NominatimUrl = config.NominatimUrl
-	ServerConfiguration.DefaultEditor = config.DefaultEditor
-	ServerConfiguration.OauthApplication = config.OauthApplication
-	ServerConfiguration.IdApplication = config.IdApplication
-	ServerConfiguration.ImageryBlacklist = config.ImageryBlacklist
-	ServerConfiguration.OverpassUrl = config.OverpassUrl
-	ServerConfiguration.OverpassCredentials = config.OverpassCredentials
-	ServerConfiguration.GraphhopperUrl = config.GraphhopperUrl
-	ServerConfiguration.FossgisOsrmUrl = config.FossgisOsrmUrl
-	ServerConfiguration.FossgisValhallaUrl = config.FossgisValhallaUrl
-	ServerConfiguration.WikidataApiUrl = config.WikidataApiUrl
-	ServerConfiguration.WikimediaCommonsUrl = config.WikimediaCommonsUrl
-	ServerConfiguration.LinkifyHosts = config.LinkifyHosts
-	ServerConfiguration.LinkifyHostsReplacement = config.LinkifyHostsReplacement
-	ServerConfiguration.LinkifyWikiHosts = config.LinkifyWikiHosts
-	ServerConfiguration.LinkifyWikiHostsReplacement = config.LinkifyWikiHostsReplacement
-	ServerConfiguration.LinkifyWikiOptionalPathPrefix = config.LinkifyWikiOptionalPathPrefix
-	ServerConfiguration.GoogleAuthId = config.GoogleAuthId
-	ServerConfiguration.GoogleAuthSecret = config.GoogleAuthSecret
-	ServerConfiguration.GoogleOpenidRealm = config.GoogleOpenidRealm
-	ServerConfiguration.FacebookAuthId = config.FacebookAuthId
-	ServerConfiguration.FacebookAuthSecret = config.FacebookAuthSecret
-	ServerConfiguration.GithubAuthId = config.GithubAuthId
-	ServerConfiguration.GithubAuthSecret = config.GithubAuthSecret
-	ServerConfiguration.MicrosoftAuthId = config.MicrosoftAuthId
-	ServerConfiguration.MicrosoftAuthSecret = config.MicrosoftAuthSecret
-	ServerConfiguration.WikipediaAuthId = config.WikipediaAuthId
-	ServerConfiguration.WikipediaAuthSecret = config.WikipediaAuthSecret
-	ServerConfiguration.ThunderforestKey = config.ThunderforestKey
-	ServerConfiguration.TracestrackKey = config.TracestrackKey
-	ServerConfiguration.TotpKey = config.TotpKey
-	ServerConfiguration.CspEnforce = config.CspEnforce
-	ServerConfiguration.CspReportUrl = config.CspReportUrl
-	ServerConfiguration.AvatarStorage = config.AvatarStorage
-	ServerConfiguration.TraceFileStorage = config.TraceFileStorage
-	ServerConfiguration.TraceImageStorage = config.TraceImageStorage
-	ServerConfiguration.TraceIconStorage = config.TraceIconStorage
-	ServerConfiguration.AvatarStorageUrl = config.AvatarStorageUrl
-	ServerConfiguration.TraceImageStorageUrl = config.TraceImageStorageUrl
-	ServerConfiguration.TraceIconStorageUrl = config.TraceIconStorageUrl
-	ServerConfiguration.TileCdnUrl = config.TileCdnUrl
-	ServerConfiguration.SmtpAddress = config.SmtpAddress
-	ServerConfiguration.SmtpPort = config.SmtpPort
-	ServerConfiguration.SmtpDomain = config.SmtpDomain
-	ServerConfiguration.SmtpEnableStarttlsAuto = config.SmtpEnableStarttlsAuto
-	ServerConfiguration.SmtpTlsVerifyMode = config.SmtpTlsVerifyMode
-	ServerConfiguration.SmtpAuthentication = config.SmtpAuthentication
-	ServerConfiguration.SmtpUserName = config.SmtpUserName
-	ServerConfiguration.SmtpPassword = config.SmtpPassword
-	ServerConfiguration.Matomo = config.Matomo
-	ServerConfiguration.SignupIpPerDay = config.SignupIpPerDay
-	ServerConfiguration.SignupIpMaxBurst = config.SignupIpMaxBurst
-	ServerConfiguration.SignupEmailPerDay = config.SignupEmailPerDay
-	ServerConfiguration.SignupEmailMaxBurst = config.SignupIpMaxBurst
-	ServerConfiguration.DoorkeeperSigningKey = config.DoorkeeperSigningKey
+	ymlPath := currentDir + "/" + configObject.YmlFilePath
+	ymlFile, err := os.Open(ymlPath)
+	if err != nil {
+		utils.LogFatal("server", "could not open yml file")
+	}
+	defer ymlFile.Close()
 
+	var osmSettings OSMSettings
+	decoder := yaml.NewDecoder(ymlFile)
+	if err := decoder.Decode(&osmSettings); err != nil {
+		utils.LogFatal("server", "could not parse yml file: "+err.Error())
+	}
+
+	// Assign the parsed settings to the ServerConfigObject
+	configObject.OSMSettings = &osmSettings
 }

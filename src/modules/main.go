@@ -2,18 +2,31 @@ package modules
 
 import (
 	"net/http"
-	capabilities "openstreetmap-go/src/modules/capabilities/api/v1"
+	clientApi "openstreetmap-go/src/modules/client/api/v1"
+	healthApi "openstreetmap-go/src/modules/health/api/v1"
+	mapApiV1 "openstreetmap-go/src/modules/map/api/v1"
+	oauth2Api "openstreetmap-go/src/modules/oauth2/api/v1"
+	user "openstreetmap-go/src/modules/user/api/v1"
 )
 
-func SetupApiRoute() *http.ServeMux {
+func SetupApiRoutes() *http.ServeMux {
 	var router = http.NewServeMux()
-	router.Handle("/api/0.6/capabilities", http.StripPrefix("/api/0.6", SetupV1()))
-	router.Handle("/api/capabilities", http.StripPrefix("/api", SetupV1()))
+	router.Handle("/api/", http.StripPrefix("/api", setupVersion1()))
 	return router
 }
 
-func SetupV1() *http.ServeMux {
+func setupVersion1() *http.ServeMux {
 	var router = http.NewServeMux()
-	router.Handle("/capabilities", capabilities.Setup())
+	router.Handle("/0.6/", http.StripPrefix("/0.6", Setup0_6Routes()))
+	return router
+}
+
+func Setup0_6Routes() *http.ServeMux {
+	var router = http.NewServeMux()
+	router.Handle("/users/", http.StripPrefix("/users", user.Setup()))
+	router.Handle("/health/", http.StripPrefix("/health", healthApi.Setup()))
+	router.Handle("/oauth2/", http.StripPrefix("/oauth2", oauth2Api.Setup()))
+	router.Handle("/client/", http.StripPrefix("/client", clientApi.Setup()))
+	router.Handle("/map", mapApiV1.Setup())
 	return router
 }

@@ -1,0 +1,873 @@
+//Notice this is only used to generate the types
+generator client {
+  provider = "go run github.com/steebchen/prisma-client-go"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model acls {
+  id      BigInt  @id @default(autoincrement())
+  address String? @db.Inet
+  k       String  @db.VarChar
+  v       String? @db.VarChar
+  domain  String? @db.VarChar
+  mx      String? @db.VarChar
+
+  @@index([k])
+  @@index([address(ops: InetOps)], map: "index_acls_on_address", type: Gist)
+  @@index([domain], map: "index_acls_on_domain")
+  @@index([mx], map: "index_acls_on_mx")
+}
+
+model active_storage_attachments {
+  id                   BigInt               @id @default(autoincrement())
+  name                 String               @db.VarChar
+  record_type          String               @db.VarChar
+  record_id            BigInt
+  blob_id              BigInt
+  created_at           DateTime             @db.Timestamp(6)
+  active_storage_blobs active_storage_blobs @relation(fields: [blob_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_c3b3935057")
+
+  @@unique([record_type, record_id, name, blob_id], map: "index_active_storage_attachments_uniqueness")
+  @@index([blob_id], map: "index_active_storage_attachments_on_blob_id")
+}
+
+model active_storage_blobs {
+  id                             BigInt                           @id @default(autoincrement())
+  key                            String                           @unique(map: "index_active_storage_blobs_on_key") @db.VarChar
+  filename                       String                           @db.VarChar
+  content_type                   String?                          @db.VarChar
+  metadata                       String?
+  byte_size                      BigInt
+  checksum                       String?                          @db.VarChar
+  created_at                     DateTime                         @db.Timestamp(6)
+  service_name                   String                           @db.VarChar
+  active_storage_attachments     active_storage_attachments[]
+  active_storage_variant_records active_storage_variant_records[]
+}
+
+model active_storage_variant_records {
+  id                   BigInt               @id @default(autoincrement())
+  blob_id              BigInt
+  variation_digest     String               @db.VarChar
+  active_storage_blobs active_storage_blobs @relation(fields: [blob_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_993965df05")
+
+  @@unique([blob_id, variation_digest], map: "index_active_storage_variant_records_uniqueness")
+}
+
+model ar_internal_metadata {
+  key        String   @id @db.VarChar
+  value      String?  @db.VarChar
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+}
+
+model changeset_comments {
+  id           Int        @id @default(autoincrement())
+  changeset_id BigInt
+  author_id    BigInt
+  body         String
+  created_at   DateTime   @db.Timestamp(6)
+  visible      Boolean
+  users        users      @relation(fields: [author_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  changesets   changesets @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([author_id, created_at], map: "index_changeset_comments_on_author_id_and_created_at")
+  @@index([author_id, id], map: "index_changeset_comments_on_author_id_and_id")
+  @@index([changeset_id, created_at], map: "index_changeset_comments_on_changeset_id_and_created_at")
+  @@index([created_at], map: "index_changeset_comments_on_created_at")
+}
+
+model changeset_tags {
+  changeset_id BigInt
+  k            String     @default("") @db.VarChar
+  v            String     @default("") @db.VarChar
+  changesets   changesets @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "changeset_tags_id_fkey")
+
+  @@id([changeset_id, k])
+}
+
+model changesets {
+  id                     BigInt                   @id @default(autoincrement())
+  user_id                BigInt
+  created_at             DateTime                 @db.Timestamp(6)
+  min_lat                Int?
+  max_lat                Int?
+  min_lon                Int?
+  max_lon                Int?
+  closed_at              DateTime                 @db.Timestamp(6)
+  num_changes            Int                      @default(0)
+  num_created_nodes      Int                      @default(0)
+  num_modified_nodes     Int                      @default(0)
+  num_deleted_nodes      Int                      @default(0)
+  num_created_ways       Int                      @default(0)
+  num_modified_ways      Int                      @default(0)
+  num_deleted_ways       Int                      @default(0)
+  num_created_relations  Int                      @default(0)
+  num_modified_relations Int                      @default(0)
+  num_deleted_relations  Int                      @default(0)
+  changeset_comments     changeset_comments[]
+  changeset_tags         changeset_tags[]
+  users                  users                    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  changesets_subscribers changesets_subscribers[]
+  current_nodes          current_nodes[]
+  current_relations      current_relations[]
+  current_ways           current_ways[]
+  nodes                  nodes[]
+  relations              relations[]
+  ways                   ways[]
+
+  // @@index([min_lat, max_lat, min_lon, max_lon], map: "changesets_bbox_idx", type: Gist)
+  @@index([closed_at])
+  @@index([created_at])
+  @@index([user_id, created_at])
+  @@index([user_id, id])
+  @@index([user_id, closed_at], map: "index_changesets_on_user_id_and_closed_at")
+}
+
+model changesets_subscribers {
+  subscriber_id BigInt
+  changeset_id  BigInt
+  changesets    changesets @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users         users      @relation(fields: [subscriber_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([subscriber_id, changeset_id], map: "index_changesets_subscribers_on_subscriber_id_and_changeset_id")
+  @@index([changeset_id], map: "index_changesets_subscribers_on_changeset_id")
+}
+
+model current_node_tags {
+  node_id       BigInt
+  k             String        @default("") @db.VarChar
+  v             String        @default("") @db.VarChar
+  current_nodes current_nodes @relation(fields: [node_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "current_node_tags_id_fkey")
+
+  @@id([node_id, k])
+}
+
+model current_nodes {
+  id                BigInt              @id(map: "current_nodes_pkey1") @default(autoincrement())
+  latitude          Int
+  longitude         Int
+  changeset_id      BigInt
+  visible           Boolean
+  timestamp         DateTime            @db.Timestamp(6)
+  tile              BigInt
+  version           BigInt
+  current_node_tags current_node_tags[]
+  changesets        changesets          @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  current_way_nodes current_way_nodes[]
+
+  @@index([tile])
+  @@index([timestamp])
+}
+
+model current_relation_members {
+  relation_id       BigInt
+  member_type       nwr_enum
+  member_id         BigInt
+  member_role       String            @db.VarChar
+  sequence_id       Int               @default(0)
+  current_relations current_relations @relation(fields: [relation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "current_relation_members_id_fkey")
+
+  @@id([relation_id, sequence_id])
+  @@index([member_type, member_id], map: "current_relation_members_member_idx")
+}
+
+model current_relation_tags {
+  relation_id       BigInt
+  k                 String            @default("") @db.VarChar
+  v                 String            @default("") @db.VarChar
+  current_relations current_relations @relation(fields: [relation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "current_relation_tags_id_fkey")
+
+  @@id([relation_id, k])
+}
+
+model current_relations {
+  id                       BigInt                     @id @default(autoincrement())
+  changeset_id             BigInt
+  timestamp                DateTime                   @db.Timestamp(6)
+  visible                  Boolean
+  version                  BigInt
+  current_relation_members current_relation_members[]
+  current_relation_tags    current_relation_tags[]
+  changesets               changesets                 @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([timestamp])
+}
+
+model current_way_nodes {
+  way_id        BigInt
+  node_id       BigInt
+  sequence_id   BigInt
+  current_ways  current_ways  @relation(fields: [way_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "current_way_nodes_id_fkey")
+  current_nodes current_nodes @relation(fields: [node_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([way_id, sequence_id])
+  @@index([node_id], map: "current_way_nodes_node_idx")
+}
+
+model current_way_tags {
+  way_id       BigInt
+  k            String       @default("") @db.VarChar
+  v            String       @default("") @db.VarChar
+  current_ways current_ways @relation(fields: [way_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "current_way_tags_id_fkey")
+
+  @@id([way_id, k])
+}
+
+model current_ways {
+  id                BigInt              @id @default(autoincrement())
+  changeset_id      BigInt
+  timestamp         DateTime            @db.Timestamp(6)
+  visible           Boolean
+  version           BigInt
+  current_way_nodes current_way_nodes[]
+  current_way_tags  current_way_tags[]
+  changesets        changesets          @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([timestamp])
+}
+
+model delayed_jobs {
+  id         BigInt    @id @default(autoincrement())
+  priority   Int       @default(0)
+  attempts   Int       @default(0)
+  handler    String
+  last_error String?
+  run_at     DateTime? @db.Timestamp(6)
+  locked_at  DateTime? @db.Timestamp(6)
+  failed_at  DateTime? @db.Timestamp(6)
+  locked_by  String?   @db.VarChar
+  queue      String?   @db.VarChar
+  created_at DateTime? @db.Timestamp(6)
+  updated_at DateTime? @db.Timestamp(6)
+
+  @@index([priority, run_at], map: "delayed_jobs_priority")
+}
+
+model diary_comments {
+  id             BigInt        @id @default(autoincrement())
+  diary_entry_id BigInt
+  user_id        BigInt
+  body           String
+  created_at     DateTime      @db.Timestamp(6)
+  updated_at     DateTime      @db.Timestamp(6)
+  visible        Boolean       @default(true)
+  body_format    format_enum   @default(markdown)
+  diary_entries  diary_entries @relation(fields: [diary_entry_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          users         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([diary_entry_id, id], map: "diary_comments_entry_id_idx")
+  @@index([user_id, created_at], map: "diary_comment_user_id_created_at_index")
+  @@index([user_id, id], map: "index_diary_comments_on_user_id_and_id")
+}
+
+model diary_entries {
+  id                        BigInt                      @id @default(autoincrement())
+  user_id                   BigInt
+  title                     String                      @db.VarChar
+  body                      String
+  created_at                DateTime                    @db.Timestamp(6)
+  updated_at                DateTime                    @db.Timestamp(6)
+  latitude                  Float?
+  longitude                 Float?
+  language_code             String                      @default("en") @db.VarChar
+  visible                   Boolean                     @default(true)
+  body_format               format_enum                 @default(markdown)
+  diary_comments            diary_comments[]
+  languages                 languages                   @relation(fields: [language_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  users                     users                       @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  diary_entry_subscriptions diary_entry_subscriptions[]
+
+  @@index([created_at], map: "diary_entry_created_at_index")
+  @@index([language_code, created_at], map: "diary_entry_language_code_created_at_index")
+  @@index([user_id, created_at], map: "diary_entry_user_id_created_at_index")
+}
+
+model diary_entry_subscriptions {
+  user_id        BigInt
+  diary_entry_id BigInt
+  diary_entries  diary_entries @relation(fields: [diary_entry_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          users         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([user_id, diary_entry_id])
+  @@index([diary_entry_id], map: "index_diary_entry_subscriptions_on_diary_entry_id")
+}
+
+model friends {
+  id                                  BigInt    @id @default(autoincrement())
+  user_id                             BigInt
+  friend_user_id                      BigInt
+  created_at                          DateTime? @db.Timestamp(6)
+  users_friends_friend_user_idTousers users     @relation("friends_friend_user_idTousers", fields: [friend_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_friends_user_idTousers        users     @relation("friends_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id, created_at], map: "index_friends_on_user_id_and_created_at")
+  @@index([friend_user_id], map: "user_id_idx")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model gps_points {
+  altitude  Float?
+  trackid   Int
+  latitude  Int
+  longitude Int
+  gpx_id    BigInt
+  timestamp DateTime? @db.Timestamp(6)
+  tile      BigInt?
+  gpx_files gpx_files @relation(fields: [gpx_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([gpx_id], map: "points_gpxid_idx")
+  @@index([tile], map: "points_tile_idx")
+  @@ignore
+}
+
+model gpx_file_tags {
+  gpx_id    BigInt
+  tag       String    @db.VarChar
+  id        BigInt    @id @default(autoincrement())
+  gpx_files gpx_files @relation(fields: [gpx_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([gpx_id], map: "gpx_file_tags_gpxid_idx")
+  @@index([tag])
+}
+
+model gpx_files {
+  id            BigInt              @id @default(autoincrement())
+  user_id       BigInt
+  visible       Boolean             @default(true)
+  name          String              @default("") @db.VarChar
+  size          BigInt?
+  latitude      Float?
+  longitude     Float?
+  timestamp     DateTime            @db.Timestamp(6)
+  description   String              @default("") @db.VarChar
+  inserted      Boolean
+  visibility    gpx_visibility_enum @default(public)
+  gps_points    gps_points[]        @ignore
+  gpx_file_tags gpx_file_tags[]
+  users         users               @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([timestamp])
+  @@index([user_id])
+  @@index([visible, visibility])
+  @@index([user_id, id], map: "index_gpx_files_on_user_id_and_id")
+}
+
+model issue_comments {
+  id         Int      @id @default(autoincrement())
+  issue_id   Int
+  user_id    Int
+  body       String
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+  issues     issues   @relation(fields: [issue_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // users      users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([issue_id], map: "index_issue_comments_on_issue_id")
+  @@index([user_id], map: "index_issue_comments_on_user_id")
+}
+
+model issues {
+  id               Int               @id @default(autoincrement())
+  reportable_type  String            @db.VarChar
+  reportable_id    Int
+  reported_user_id Int?
+  status           issue_status_enum @default(open)
+  assigned_role    user_role_enum
+  resolved_at      DateTime?         @db.Timestamp(6)
+  resolved_by      Int?
+  updated_by       Int?
+  reports_count    Int?              @default(0)
+  created_at       DateTime          @db.Timestamp(6)
+  updated_at       DateTime          @db.Timestamp(6)
+  issue_comments   issue_comments[]
+  // users_issues_reported_user_idTousers users?            @relation("issues_reported_user_idTousers", fields: [reported_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // users_issues_resolved_byTousers      users?            @relation("issues_resolved_byTousers", fields: [resolved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // users_issues_updated_byTousers       users?            @relation("issues_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reports          reports[]
+
+  @@index([assigned_role], map: "index_issues_on_assigned_role")
+  @@index([reportable_type, reportable_id], map: "index_issues_on_reportable_type_and_reportable_id")
+  @@index([reported_user_id], map: "index_issues_on_reported_user_id")
+  @@index([status], map: "index_issues_on_status")
+  @@index([updated_by], map: "index_issues_on_updated_by")
+}
+
+model languages {
+  code          String          @id @db.VarChar
+  english_name  String          @db.VarChar
+  native_name   String?         @db.VarChar
+  diary_entries diary_entries[]
+}
+
+model messages {
+  id                                 BigInt      @id @default(autoincrement())
+  from_user_id                       BigInt
+  title                              String      @db.VarChar
+  body                               String
+  sent_on                            DateTime    @db.Timestamp(6)
+  message_read                       Boolean     @default(false)
+  to_user_id                         BigInt
+  to_user_visible                    Boolean     @default(true)
+  from_user_visible                  Boolean     @default(true)
+  body_format                        format_enum @default(markdown)
+  muted                              Boolean     @default(false)
+  users_messages_from_user_idTousers users       @relation("messages_from_user_idTousers", fields: [from_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_messages_to_user_idTousers   users       @relation("messages_to_user_idTousers", fields: [to_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([from_user_id])
+  @@index([to_user_id])
+}
+
+model node_tags {
+  node_id BigInt
+  version BigInt
+  k       String @default("") @db.VarChar
+  v       String @default("") @db.VarChar
+  nodes   nodes  @relation(fields: [node_id, version], references: [node_id, version], onDelete: NoAction, onUpdate: NoAction, map: "node_tags_id_fkey")
+
+  @@id([node_id, version, k])
+}
+
+model nodes {
+  node_id      BigInt
+  latitude     Int
+  longitude    Int
+  changeset_id BigInt
+  visible      Boolean
+  timestamp    DateTime    @db.Timestamp(6)
+  tile         BigInt
+  version      BigInt
+  redaction_id Int?
+  node_tags    node_tags[]
+  changesets   changesets  @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  redactions   redactions? @relation(fields: [redaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([node_id, version])
+  @@index([changeset_id])
+  @@index([tile])
+  @@index([timestamp])
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model note_comments {
+  id         BigInt           @id @default(autoincrement())
+  note_id    BigInt
+  visible    Boolean
+  created_at DateTime         @db.Timestamp(6)
+  author_ip  String?          @db.Inet
+  author_id  BigInt?
+  body       String?
+  event      note_event_enum?
+  users      users?           @relation(fields: [author_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  notes      notes            @relation(fields: [note_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([author_id, created_at], map: "index_note_comments_on_author_id_and_created_at")
+  @@index([created_at], map: "index_note_comments_on_created_at")
+  @@index([note_id])
+}
+
+model note_subscriptions {
+  user_id BigInt
+  note_id BigInt
+  notes   notes  @relation(fields: [note_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_2c1913f293")
+  users   users  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_a352f4eced")
+
+  @@id([user_id, note_id])
+  @@index([note_id], map: "index_note_subscriptions_on_note_id")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model notes {
+  id                 BigInt               @id @default(autoincrement())
+  latitude           Int
+  longitude          Int
+  tile               BigInt
+  updated_at         DateTime             @db.Timestamp(6)
+  created_at         DateTime             @db.Timestamp(6)
+  status             note_status_enum
+  closed_at          DateTime?            @db.Timestamp(6)
+  description        String               @default("")
+  user_id            BigInt?
+  user_ip            String?              @db.Inet
+  note_comments      note_comments[]
+  note_subscriptions note_subscriptions[]
+  users              users?               @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at])
+  @@index([tile, status])
+  @@index([updated_at])
+}
+
+model oauth_access_grants {
+  id                    BigInt                  @id @default(autoincrement())
+  resource_owner_id     BigInt
+  application_id        BigInt
+  token                 String                  @unique(map: "index_oauth_access_grants_on_token") @db.VarChar
+  expires_in            Int
+  redirect_uri          String
+  created_at            DateTime                @db.Timestamp(6)
+  revoked_at            DateTime?               @db.Timestamp(6)
+  scopes                String                  @default("") @db.VarChar
+  code_challenge        String?                 @db.VarChar
+  code_challenge_method String?                 @db.VarChar
+  users                 users                   @relation(fields: [resource_owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_330c32d8d9")
+  oauth_applications    oauth_applications      @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_b4b53e07b8")
+  oauth_openid_requests oauth_openid_requests[]
+
+  @@index([application_id], map: "index_oauth_access_grants_on_application_id")
+  @@index([resource_owner_id], map: "index_oauth_access_grants_on_resource_owner_id")
+}
+
+model oauth_access_tokens {
+  id                     BigInt             @id @default(autoincrement())
+  resource_owner_id      BigInt?
+  application_id         BigInt
+  token                  String             @unique(map: "index_oauth_access_tokens_on_token") @db.VarChar
+  refresh_token          String?            @unique(map: "index_oauth_access_tokens_on_refresh_token") @db.VarChar
+  expires_in             Int?
+  revoked_at             DateTime?          @db.Timestamp(6)
+  created_at             DateTime           @db.Timestamp(6)
+  scopes                 String?            @db.VarChar
+  previous_refresh_token String             @default("") @db.VarChar
+  oauth_applications     oauth_applications @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_732cb83ab7")
+  users                  users?             @relation(fields: [resource_owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_ee63f25419")
+
+  @@index([application_id], map: "index_oauth_access_tokens_on_application_id")
+  @@index([resource_owner_id], map: "index_oauth_access_tokens_on_resource_owner_id")
+}
+
+model oauth_applications {
+  id                  BigInt                @id @default(autoincrement())
+  owner_type          String                @db.VarChar
+  owner_id            BigInt
+  name                String                @db.VarChar
+  uid                 String                @unique(map: "index_oauth_applications_on_uid") @db.VarChar
+  secret              String                @db.VarChar
+  redirect_uri        String
+  scopes              String                @default("") @db.VarChar
+  confidential        Boolean               @default(true)
+  created_at          DateTime              @db.Timestamp(6)
+  updated_at          DateTime              @db.Timestamp(6)
+  oauth_access_grants oauth_access_grants[]
+  oauth_access_tokens oauth_access_tokens[]
+  users               users                 @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_cc886e315a")
+
+  @@index([owner_type, owner_id], map: "index_oauth_applications_on_owner_type_and_owner_id")
+}
+
+model oauth_openid_requests {
+  id                  BigInt              @id @default(autoincrement())
+  access_grant_id     BigInt
+  nonce               String              @db.VarChar
+  oauth_access_grants oauth_access_grants @relation(fields: [access_grant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rails_77114b3b09")
+
+  @@index([access_grant_id], map: "index_oauth_openid_requests_on_access_grant_id")
+}
+
+model redactions {
+  id                 Int         @id @default(autoincrement())
+  title              String      @db.VarChar
+  description        String
+  created_at         DateTime?   @db.Timestamp(6)
+  updated_at         DateTime?   @db.Timestamp(6)
+  user_id            BigInt
+  description_format format_enum @default(markdown)
+  nodes              nodes[]
+  users              users       @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  relations          relations[]
+  ways               ways[]
+}
+
+model relation_members {
+  relation_id BigInt
+  member_type nwr_enum
+  member_id   BigInt
+  member_role String    @db.VarChar
+  version     BigInt    @default(0)
+  sequence_id Int       @default(0)
+  relations   relations @relation(fields: [relation_id, version], references: [relation_id, version], onDelete: NoAction, onUpdate: NoAction, map: "relation_members_id_fkey")
+
+  @@id([relation_id, version, sequence_id])
+  @@index([member_type, member_id], map: "relation_members_member_idx")
+}
+
+model relation_tags {
+  relation_id BigInt
+  k           String    @default("") @db.VarChar
+  v           String    @default("") @db.VarChar
+  version     BigInt
+  relations   relations @relation(fields: [relation_id, version], references: [relation_id, version], onDelete: NoAction, onUpdate: NoAction, map: "relation_tags_id_fkey")
+
+  @@id([relation_id, version, k])
+}
+
+model relations {
+  relation_id      BigInt
+  changeset_id     BigInt
+  timestamp        DateTime           @db.Timestamp(6)
+  version          BigInt
+  visible          Boolean            @default(true)
+  redaction_id     Int?
+  relation_members relation_members[]
+  relation_tags    relation_tags[]
+  changesets       changesets         @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  redactions       redactions?        @relation(fields: [redaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([relation_id, version])
+  @@index([changeset_id])
+  @@index([timestamp])
+}
+
+model reports {
+  id         Int      @id @default(autoincrement())
+  issue_id   Int
+  user_id    Int
+  details    String
+  category   String   @db.VarChar
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+  issues     issues   @relation(fields: [issue_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // users      users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([issue_id], map: "index_reports_on_issue_id")
+  @@index([user_id], map: "index_reports_on_user_id")
+}
+
+model schema_migrations {
+  version String @id @db.VarChar
+}
+
+model social_links {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  url        String   @db.VarChar
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_6034fd4f62")
+
+  @@index([user_id], map: "index_social_links_on_user_id")
+}
+
+model user_blocks {
+  id                                  Int         @id @default(autoincrement())
+  user_id                             BigInt
+  creator_id                          BigInt
+  reason                              String
+  ends_at                             DateTime    @db.Timestamp(6)
+  needs_view                          Boolean     @default(false)
+  revoker_id                          BigInt?
+  created_at                          DateTime?   @db.Timestamp(6)
+  updated_at                          DateTime?   @db.Timestamp(6)
+  reason_format                       format_enum @default(markdown)
+  deactivates_at                      DateTime?   @db.Timestamp(6)
+  users_user_blocks_creator_idTousers users       @relation("user_blocks_creator_idTousers", fields: [creator_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_blocks_moderator_id_fkey")
+  users_user_blocks_revoker_idTousers users?      @relation("user_blocks_revoker_idTousers", fields: [revoker_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_user_blocks_user_idTousers    users       @relation("user_blocks_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([creator_id, id], map: "index_user_blocks_on_creator_id_and_id")
+  @@index([user_id], map: "index_user_blocks_on_user_id")
+}
+
+model user_mutes {
+  id                                 BigInt   @id @default(autoincrement())
+  owner_id                           BigInt
+  subject_id                         BigInt
+  created_at                         DateTime @db.Timestamp(6)
+  updated_at                         DateTime @db.Timestamp(6)
+  users_user_mutes_owner_idTousers   users    @relation("user_mutes_owner_idTousers", fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_591dad3359")
+  users_user_mutes_subject_idTousers users    @relation("user_mutes_subject_idTousers", fields: [subject_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_e9dd4fb6c3")
+
+  @@unique([owner_id, subject_id], map: "index_user_mutes_on_owner_id_and_subject_id")
+}
+
+model user_preferences {
+  user_id BigInt
+  k       String @db.VarChar
+  v       String @db.VarChar
+  users   users  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([user_id, k])
+}
+
+model user_roles {
+  id                                 Int            @id @default(autoincrement())
+  user_id                            BigInt
+  role                               user_role_enum
+  created_at                         DateTime?      @db.Timestamp(6)
+  updated_at                         DateTime?      @db.Timestamp(6)
+  granter_id                         BigInt
+  users_user_roles_granter_idTousers users          @relation("user_roles_granter_idTousers", fields: [granter_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_user_roles_user_idTousers    users          @relation("user_roles_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([user_id, role], map: "user_roles_id_role_unique")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model users {
+  email                                     String                      @unique(map: "users_email_idx") @db.VarChar
+  id                                        BigInt                      @id @default(autoincrement())
+  pass_crypt                                String                      @db.VarChar
+  creation_time                             DateTime                    @db.Timestamp(6)
+  display_name                              String                      @unique(map: "users_display_name_idx") @default("") @db.VarChar
+  data_public                               Boolean                     @default(false)
+  description                               String                      @default("")
+  home_lat                                  Float?
+  home_lon                                  Float?
+  home_zoom                                 Int?                        @default(3) @db.SmallInt
+  pass_salt                                 String?                     @db.VarChar
+  email_valid                               Boolean                     @default(false)
+  new_email                                 String?                     @db.VarChar
+  languages                                 String?                     @db.VarChar
+  status                                    user_status_enum            @default(pending)
+  terms_agreed                              DateTime?                   @db.Timestamp(6)
+  consider_pd                               Boolean                     @default(false)
+  auth_uid                                  String?                     @db.VarChar
+  preferred_editor                          String?                     @db.VarChar
+  terms_seen                                Boolean                     @default(false)
+  description_format                        format_enum                 @default(markdown)
+  changesets_count                          Int                         @default(0)
+  traces_count                              Int                         @default(0)
+  diary_entries_count                       Int                         @default(0)
+  image_use_gravatar                        Boolean                     @default(false)
+  auth_provider                             String?                     @db.VarChar
+  home_tile                                 BigInt?
+  tou_agreed                                DateTime?                   @db.Timestamp(6)
+  diary_comments_count                      Int?                        @default(0)
+  note_comments_count                       Int?                        @default(0)
+  creation_address                          String?                     @db.Inet
+  home_location_name                        String?                     @db.VarChar
+  company                                   String?                     @db.VarChar
+  changeset_comments                        changeset_comments[]
+  changesets                                changesets[]
+  changesets_subscribers                    changesets_subscribers[]
+  diary_comments                            diary_comments[]
+  diary_entries                             diary_entries[]
+  diary_entry_subscriptions                 diary_entry_subscriptions[]
+  friends_friends_friend_user_idTousers     friends[]                   @relation("friends_friend_user_idTousers")
+  friends_friends_user_idTousers            friends[]                   @relation("friends_user_idTousers")
+  gpx_files                                 gpx_files[]
+  // issue_comments                            issue_comments[]
+  // issues_issues_reported_user_idTousers     issues[]                    @relation("issues_reported_user_idTousers")
+  // issues_issues_resolved_byTousers          issues[]                    @relation("issues_resolved_byTousers")
+  // issues_issues_updated_byTousers           issues[]                    @relation("issues_updated_byTousers")
+  messages_messages_from_user_idTousers     messages[]                  @relation("messages_from_user_idTousers")
+  messages_messages_to_user_idTousers       messages[]                  @relation("messages_to_user_idTousers")
+  note_comments                             note_comments[]
+  note_subscriptions                        note_subscriptions[]
+  notes                                     notes[]
+  oauth_access_grants                       oauth_access_grants[]
+  oauth_access_tokens                       oauth_access_tokens[]
+  oauth_applications                        oauth_applications[]
+  redactions                                redactions[]
+  // reports                                   reports[]
+  social_links                              social_links[]
+  user_blocks_user_blocks_creator_idTousers user_blocks[]               @relation("user_blocks_creator_idTousers")
+  user_blocks_user_blocks_revoker_idTousers user_blocks[]               @relation("user_blocks_revoker_idTousers")
+  user_blocks_user_blocks_user_idTousers    user_blocks[]               @relation("user_blocks_user_idTousers")
+  user_mutes_user_mutes_owner_idTousers     user_mutes[]                @relation("user_mutes_owner_idTousers")
+  user_mutes_user_mutes_subject_idTousers   user_mutes[]                @relation("user_mutes_subject_idTousers")
+  user_preferences                          user_preferences[]
+  user_roles_user_roles_granter_idTousers   user_roles[]                @relation("user_roles_granter_idTousers")
+  user_roles_user_roles_user_idTousers      user_roles[]                @relation("user_roles_user_idTousers")
+
+  @@unique([auth_provider, auth_uid], map: "users_auth_idx")
+  @@index([creation_address(ops: InetOps)], map: "index_users_on_creation_address", type: Gist)
+  @@index([home_tile], map: "users_home_idx")
+}
+
+model way_nodes {
+  way_id      BigInt
+  node_id     BigInt
+  version     BigInt
+  sequence_id BigInt
+  ways        ways   @relation(fields: [way_id, version], references: [way_id, version], onDelete: NoAction, onUpdate: NoAction, map: "way_nodes_id_fkey")
+
+  @@id([way_id, version, sequence_id])
+  @@index([node_id], map: "way_nodes_node_idx")
+}
+
+model way_tags {
+  way_id  BigInt
+  k       String @db.VarChar
+  v       String @db.VarChar
+  version BigInt
+  ways    ways   @relation(fields: [way_id, version], references: [way_id, version], onDelete: NoAction, onUpdate: NoAction, map: "way_tags_id_fkey")
+
+  @@id([way_id, version, k])
+}
+
+model ways {
+  way_id       BigInt
+  changeset_id BigInt
+  timestamp    DateTime    @db.Timestamp(6)
+  version      BigInt
+  visible      Boolean     @default(true)
+  redaction_id Int?
+  way_nodes    way_nodes[]
+  way_tags     way_tags[]
+  changesets   changesets  @relation(fields: [changeset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  redactions   redactions? @relation(fields: [redaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([way_id, version])
+  @@index([changeset_id])
+  @@index([timestamp])
+}
+
+enum format_enum {
+  html
+  markdown
+  text
+}
+
+enum gpx_visibility_enum {
+  private
+  public
+  trackable
+  identifiable
+}
+
+enum issue_status_enum {
+  open
+  ignored
+  resolved
+}
+
+enum note_event_enum {
+  opened
+  closed
+  reopened
+  commented
+  hidden
+}
+
+enum note_status_enum {
+  open
+  closed
+  hidden
+}
+
+enum nwr_enum {
+  Node
+  Way
+  Relation
+}
+
+enum user_role_enum {
+  administrator
+  moderator
+  importer
+}
+
+enum user_status_enum {
+  pending
+  active
+  confirmed
+  suspended
+  deleted
+}

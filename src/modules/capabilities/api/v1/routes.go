@@ -2,16 +2,13 @@ package v1
 
 import (
 	"net/http"
+	"openstreetmap-go/src/api/middlewares"
 )
 
 func Setup() *http.ServeMux {
 	var router = http.NewServeMux()
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		err := getCapabilites(w, r)
-		if err != nil {
-			// send the error here if no error the response is already returned by the function
-		}
-	})
+
+	router.HandleFunc("/capability", middlewares.HandleError(capability))
 
 	return router
 }
