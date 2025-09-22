@@ -2,6 +2,7 @@ package modules
 
 import (
 	"net/http"
+	changesetv1 "openstreetmap-go/src/modules/changeset/api/v1"
 	clientApi "openstreetmap-go/src/modules/client/api/v1"
 	healthApi "openstreetmap-go/src/modules/health/api/v1"
 	mapApiV1 "openstreetmap-go/src/modules/map/api/v1"
@@ -27,6 +28,8 @@ func Setup0_6Routes() *http.ServeMux {
 	router.Handle("/health/", http.StripPrefix("/health", healthApi.Setup()))
 	router.Handle("/oauth2/", http.StripPrefix("/oauth2", oauth2Api.Setup()))
 	router.Handle("/client/", http.StripPrefix("/client", clientApi.Setup()))
+	router.Handle("/changeset/", http.StripPrefix("/changeset", changesetv1.Setup()))
 	router.Handle("/map", mapApiV1.Setup())
+
 	return router
 }

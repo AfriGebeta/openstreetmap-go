@@ -1,10 +1,9 @@
 package v1
 
 import (
-	"crypto/sha1"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -17,6 +16,7 @@ import (
 	"openstreetmap-go/src/modules/acl/aclRespository"
 	"openstreetmap-go/src/modules/user/repository"
 	"openstreetmap-go/src/modules/userrole/respository"
+	utils3 "openstreetmap-go/src/repository/utils"
 	utils2 "openstreetmap-go/src/utils"
 	"strconv"
 	"strings"
@@ -64,7 +64,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	var now db.DateTime = db.DateTime(time.Now())
-	user := gormModel.Users{}
+	user := &gormModel.Users{}
 
 	user.DisplayName = sanitizedDisplayName
 	user.PassCrypt = string(hashedPassword)
@@ -92,12 +92,23 @@ func CreateUser(w http.ResponseWriter, r *http.Request) error {
 	user.NoteCommentsCount = utils2.PtrOf(0)
 	user.CreationAddress = utils2.PtrOf(getClientIP(r))
 
-	_, err = repository.InsertUser(user)
+	err = repository.InsertUser(user)
 	if err != nil {
 		return err
 	}
 
-	if err = utils.EncodeBody(w, user, 200); err != nil {
+	confirmationToken, err := utils3.GenerateConfirmationToken(user.ID, config.ServerConfigObject.SecretKeyBase)
+	if err != nil {
+		return err
+	}
+	type CreateResponse struct {
+		User  gormModel.Users `json:"user"`
+		Token string          `json:"token"`
+	}
+	if err = utils.EncodeBody(w, CreateResponse{
+		User:  *user,
+		Token: confirmationToken,
+	}, 200); err != nil {
 		return apiValues.ApiErrorInternalServerError
 	}
 	return nil
@@ -154,48 +165,71 @@ func GrantRole(w http.ResponseWriter, r *http.Request) error {
 
 	return nil
 }
+func computeHMACSHA256(data, secret string) string {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(data))
+	return base64.URLEncoding.EncodeToString(h.Sum(nil))
+}
 
 func Confirm(w http.ResponseWriter, r *http.Request) error {
 	confirmString := r.URL.Query().Get("confirm_string")
 	displayName := r.PathValue("display_name")
-	if strings.TrimSpace(displayName) == "" {
-		return errors.New("display_name is required")
+
+	if strings.TrimSpace(displayName) == "" || confirmString == "" {
+		return errors.New("missing parameters")
 	}
 
-	tokenSignature := strings.Split(confirmString, "--")
-	h := sha1.New()
-	h.Write([]byte(tokenSignature[0] + config.ServerConfigObject.SecretKeyBase))
-	expectedSignature := hex.EncodeToString(h.Sum(nil))
+	parts := strings.Split(confirmString, "--")
+	if len(parts) != 2 {
+		return errors.New("invalid token format")
+	}
 
-	if tokenSignature[0] != expectedSignature {
+	signature := parts[0]
+	encodedPayload := parts[1]
+
+	payloadBytes, err := base64.URLEncoding.DecodeString(encodedPayload)
+	if err != nil {
+		return err
+	}
+
+	payload := string(payloadBytes)
+	expectedSig := computeHMACSHA256(payload, config.ServerConfigObject.SecretKeyBase)
+
+	if signature != expectedSig {
 		return errors.New("invalid token")
 	}
 
-	decoded, err := base64.StdEncoding.DecodeString(tokenSignature[1])
+	splitPayload := strings.Split(payload, ":")
+	if len(splitPayload) != 2 {
+		return errors.New("invalid payload format")
+	}
+
+	userID, err := strconv.ParseInt(splitPayload[0], 10, 64)
 	if err != nil {
 		return err
 	}
 
-	var data []interface{}
-	err = json.Unmarshal(decoded, &data)
+	timestampUnix, err := strconv.ParseInt(splitPayload[1], 10, 64)
 	if err != nil {
 		return err
 	}
+	if time.Now().Unix()-timestampUnix > 86400 {
+		return errors.New("token expired")
+	}
 
-	userId := data[0].(float64)
 	_, err = repository.UpdateUser(
 		map[string]interface{}{
 			"status":      "active",
 			"email_valid": true,
 		},
 		map[string]interface{}{
-			"id": userId,
+			"id": userID,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	w.WriteHeader(201)
+	w.WriteHeader(http.StatusOK)
 	return nil
 }

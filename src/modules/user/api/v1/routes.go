@@ -9,9 +9,9 @@ import (
 
 func Setup() *http.ServeMux {
 	route := http.NewServeMux()
-	route.HandleFunc("/create", middlewares.HandleError(CreateUser))
-	route.HandleFunc("/login", middlewares.HandleError(Login))
-	route.HandleFunc("/{display_name}/confirm", middlewares.HandleError(Confirm))
-	route.HandleFunc("/grant_role", middlewares.HandleError(GrantRole))
+	route.HandleFunc("POST /create", middlewares.HandleError(CreateUser))
+	route.HandleFunc("POST /login", middlewares.HandleError(Login))
+	route.HandleFunc("GET /{display_name}/confirm", middlewares.HandleError(Confirm))
+	route.HandleFunc("GET /grant_role", middlewares.HandleError(GrantRole))
 	return route
 }

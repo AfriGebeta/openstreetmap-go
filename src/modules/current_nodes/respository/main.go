@@ -9,6 +9,18 @@ import (
 	"openstreetmap-go/src/repository/model"
 )
 
+func CreateCurrentNode(currentNode *gormModel.CurrentNodes) error {
+	return createCurrentNode(dbClient.DatabaseClients.GetMasterConnection(), currentNode)
+}
+
+func createCurrentNode(client *gorm.DB, currentNode *gormModel.CurrentNodes) error {
+	err := client.Model(&gormModel.CurrentNodes{}).Create(&currentNode).Error
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func FetchCurrentNodeInBBox(bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
 	return fetchCurrentNodeInBBox(dbClient.DatabaseClients.GetRandomConnection(), bbox, tileWhereClause)
 }
