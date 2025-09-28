@@ -12,7 +12,34 @@ import (
 func CreateCurrentNode(currentNode *gormModel.CurrentNodes) error {
 	return createCurrentNode(dbClient.DatabaseClients.GetMasterConnection(), currentNode)
 }
+func GetCurrentNodeInBBox(bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
+	return fetchCurrentNodeInBBox(dbClient.DatabaseClients.GetRandomConnection(), bbox, tileWhereClause)
+}
+func UpdateCurrentNode(id string, data map[interface{}]interface{}) error {
+	return updateCurrentNode(dbClient.DatabaseClients.GetMasterConnection(), id, data)
+}
 
+func updateCurrentNode(client *gorm.DB, id string, data map[interface{}]interface{}) error {
+	err := client.Model(gormModel.CurrentNodes{}).Where("id = ?", id).Updates(data).Error
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func GetCurrentNodeById(id int64) (gormModel.CurrentNodes, error) {
+	return getCurrentNodeById(dbClient.DatabaseClients.GetMasterConnection(), id)
+}
+
+func getCurrentNodeById(client *gorm.DB, id int64) (gormModel.CurrentNodes, error) {
+
+	var currentNode gormModel.CurrentNodes
+
+	err := client.Model(&currentNode).Where("id = ?", id).First(&currentNode).Error
+	if err != nil {
+		return gormModel.CurrentNodes{}, err
+	}
+	return currentNode, nil
+}
 func createCurrentNode(client *gorm.DB, currentNode *gormModel.CurrentNodes) error {
 	err := client.Model(&gormModel.CurrentNodes{}).Create(&currentNode).Error
 	if err != nil {
@@ -21,9 +48,6 @@ func createCurrentNode(client *gorm.DB, currentNode *gormModel.CurrentNodes) err
 	return nil
 }
 
-func FetchCurrentNodeInBBox(bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
-	return fetchCurrentNodeInBBox(dbClient.DatabaseClients.GetRandomConnection(), bbox, tileWhereClause)
-}
 func fetchCurrentNodeInBBox(db *gorm.DB, bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
 	var nodesMap = make(map[int64]*gormModel.CurrentNodes)
 	var nodes []gormModel.CurrentNodes
@@ -141,29 +165,3 @@ func fetchCurrentNodeInBBox(db *gorm.DB, bbox model.BBox, tileWhereClause string
 
 	return nodes, nil
 }
-
-//func fetchCurrentNodeInBBox(client *gorm.DB, bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
-//	var nodes []gormModel.CurrentNodes
-//	query := client.Model(&gormModel.CurrentNodes{})
-//
-//	query = query.
-//		Where("current_nodes.latitude BETWEEN ? AND ?", bbox.MinLat*1e7, bbox.MaxLat*1e7).
-//		Where("current_nodes.longitude BETWEEN ? AND ?", bbox.MinLon*1e7, bbox.MaxLon*1e7).
-//		Where("current_nodes.visible = ?", true).
-//		Preload("CurrentNodeTags").
-//		Preload("Changeset").
-//		Preload("Changeset.User")
-//
-//	if tileWhereClause != "" {
-//		query = query.Where(tileWhereClause)
-//	}
-//
-//	result := query.
-//		Limit(config.ServerConfigObject.OSMSettings.MaxNumberOfNodes).
-//		Find(&nodes)
-//
-//	if result.Error != nil {
-//		return nil, result.Error
-//	}
-//	return nodes, nil
-//}

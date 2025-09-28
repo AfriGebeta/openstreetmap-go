@@ -47,7 +47,7 @@ func GetMap(w http.ResponseWriter, r *http.Request) error {
 	tileWhereClause := geo.BuildTileAreaSQLClause(bbox, "current_nodes.")
 
 	// Note: Step 1 - filter out current nodes by tile
-	currentNodes, err := respository.FetchCurrentNodeInBBox(bbox, tileWhereClause)
+	currentNodes, err := respository.GetCurrentNodeInBBox(bbox, tileWhereClause)
 	if err != nil {
 		return err
 	}

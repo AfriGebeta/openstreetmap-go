@@ -227,6 +227,16 @@ func upload(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	err = ProcessModifyElement(changesetIdInt64, osm.Modify, &uploadResult)
+	if err != nil {
+		return err
+	}
+
+	err = ProcessDeleteElement(changesetIdInt64, osm.Modify, &uploadResult)
+	if err != nil {
+		return err
+	}
+
 	minLat := uploadResult.Node[0].Lat
 	minLon := uploadResult.Node[0].Lon
 	maxLat := uploadResult.Node[0].Lat

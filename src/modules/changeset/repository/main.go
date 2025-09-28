@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 	"openstreetmap-go/src/db/client"
 	gormModel "openstreetmap-go/src/db/generated/gorm"
+	"strconv"
 	"time"
 )
 
@@ -21,13 +22,59 @@ func InsertIntoChangeset(changeset *gormModel.Changesets, changesetTags []gormMo
 func CreateNewNode(currentNode *gormModel.CurrentNodes, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
 	return createNewNode(client.DatabaseClients.GetMasterConnection(), currentNode, nodes, currentNodeTags, nodeTags)
 }
+func ModifyNode(nodeId string, data map[interface{}]interface{}, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
+	return modifyNode(client.DatabaseClients.GetMasterConnection(), nodeId, data, nodes, currentNodeTags, nodeTags)
+}
+
+func modifyNode(client *gorm.DB, nodeId string, data map[interface{}]interface{}, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	err := client.Model(gormModel.CurrentNodes{}).Where("id = ?", nodeId).Updates(data).Error
+	if err != nil {
+		return err
+	}
+
+	nodeIdInt, err := strconv.ParseInt(nodeId, 10, 64)
+	if err != nil {
+		return err
+	}
+	nodes.NodeId = nodeIdInt
+
+	err = client.Model(&gormModel.Nodes{}).Create(&nodes).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, nodeTag := range nodeTags {
+		nodeTag.NodeId = nodeIdInt
+		err = tx.Model(&gormModel.NodeTags{}).Create(nodeTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	for _, currentNodeTag := range currentNodeTags {
+		currentNodeTag.NodeId = nodeIdInt
+		err = tx.Model(&gormModel.CurrentNodeTags{}).Create(currentNodeTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return nil
+
+}
 
 func UpdateChangeset(id string, data map[interface{}]interface{}) error {
 	return updateChangeset(client.DatabaseClients.GetMasterConnection(), id, data)
 }
 
 func updateChangeset(client *gorm.DB, id string, data map[interface{}]interface{}) error {
-	err := client.Model(data).Where("id = ?", id).Updates(data).Error
+	err := client.Model(gormModel.Changesets{}).Where("id = ?", id).Updates(data).Error
 	if err != nil {
 		return err
 	}

@@ -8,7 +8,7 @@ import (
 func Setup() *http.ServeMux {
 	route := http.NewServeMux()
 	route.HandleFunc("PUT /create", middlewares.HandleError(create))
-	route.HandleFunc("POST {id}/upload", middlewares.HandleError(upload))
-	route.HandleFunc("PUT {id}/close", middlewares.HandleError(closeChangeset))
+	route.HandleFunc("POST /{id}/upload", middlewares.HandleError(upload))
+	route.HandleFunc("PUT /{id}/close", middlewares.HandleError(closeChangeset))
 	return route
 }
