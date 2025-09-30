@@ -35,3 +35,4 @@ deployment-files/*
 # Editor/IDE
 .idea/
 .vscode/
+content/*
