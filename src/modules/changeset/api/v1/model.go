@@ -70,10 +70,17 @@ type Tag struct {
 }
 
 type UploadChangesetResult struct {
-	Node []UploadChangesetNode `xml:"node"`
-	Way  []UploadChangesetWay  `xml:"way"`
+	Node     []UploadChangesetNode     `xml:"node"`
+	Way      []UploadChangesetWay      `xml:"way"`
+	Relation []UploadChangesetRelation `xml:"relation"`
 }
 
+type UploadChangesetRelation struct {
+	OldId      int64  `xml:"old_id,attr"`
+	NewId      int64  `xml:"new_id,attr"`
+	NewVersion int64  `xml:"new_version,attr"`
+	Action     string `xml:"action,attr"`
+}
 type UploadChangesetWay struct {
 	OldId      int64 `xml:"old_id,attr"`
 	NewId      int64 `xml:"new_id,attr"`

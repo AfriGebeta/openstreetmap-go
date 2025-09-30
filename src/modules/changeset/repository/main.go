@@ -165,6 +165,76 @@ func updateChangeset(client *gorm.DB, id string, data map[interface{}]interface{
 	return nil
 }
 
+func DeleteWay(wayId int64, data map[string]interface{}, oldWay *gormModel.Ways) error {
+	return deleteWay(client.DatabaseClients.GetMasterConnection(), wayId, data, oldWay)
+}
+
+func DeleteRelation(wayId int64, data map[string]interface{}, oldRelation *gormModel.Relations) error {
+	return deleteRelation(client.DatabaseClients.GetMasterConnection(), wayId, data, oldRelation)
+}
+
+func deleteRelation(client *gorm.DB, relationId int64, data map[string]interface{}, oldRelation *gormModel.Relations) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	err := tx.Model(gormModel.CurrentRelations{}).Where("id = ?", relationId).Updates(data).Error
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Where("relation_id = ?", relationId).Delete(&gormModel.CurrentRelationTags{}).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Where("relation_id = ?", relationId).Delete(&gormModel.CurrentRelationMembers{}).Error; err != nil {
+	}
+
+	err = tx.Model(&gormModel.Relations{}).Create(&oldRelation).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return nil
+}
+
+func deleteWay(client *gorm.DB, wayId int64, data map[string]interface{}, oldWay *gormModel.Ways) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	err := tx.Model(gormModel.CurrentWays{}).Where("id = ?", wayId).Updates(data).Error
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Where("way_id = ?", wayId).Delete(&gormModel.CurrentWayTags{}).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Where("way_id = ?", wayId).Delete(&gormModel.CurrentWayNodes{}).Error; err != nil {
+	}
+
+	err = tx.Model(&gormModel.Ways{}).Create(&oldWay).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return nil
+}
+
 func deleteNode(client *gorm.DB, nodeId int64, data map[string]interface{}, nodes *gormModel.Nodes) error {
 	tx := client.Begin()
 	if tx.Error != nil {
@@ -176,7 +246,7 @@ func deleteNode(client *gorm.DB, nodeId int64, data map[string]interface{}, node
 		return err
 	}
 
-	if err := tx.Where("node_id = ?", nodeId).Delete(&gormModel.CurrentWayTags{}).Error; err != nil {
+	if err := tx.Where("node_id = ?", nodeId).Delete(&gormModel.CurrentNodeTags{}).Error; err != nil {
 		return err
 	}
 
@@ -332,6 +402,7 @@ func modifyWay(client *gorm.DB, wayId int64, wayModify map[string]interface{}, c
 			return err
 		}
 	}
+
 	oldway.WayId = wayId
 	err = tx.Model(&gormModel.Ways{}).Create(oldway).Error
 	if err != nil {
@@ -363,4 +434,142 @@ func modifyWay(client *gorm.DB, wayId int64, wayModify map[string]interface{}, c
 
 	return nil
 
+}
+
+func CreateRelation(currentRelation *gormModel.CurrentRelations, oldRelation gormModel.Relations, currentRelationTags []gormModel.CurrentRelationTags, currentRelationMembers []gormModel.CurrentRelationMembers, relationMembers []gormModel.RelationMembers, oldRelationTags []gormModel.RelationTags) error {
+	return createRelation(client.DatabaseClients.GetMasterConnection(), currentRelation, oldRelation, currentRelationTags, currentRelationMembers, relationMembers, oldRelationTags)
+}
+
+func createRelation(client *gorm.DB, currentRelation *gormModel.CurrentRelations, oldRelation gormModel.Relations, currentRelationTags []gormModel.CurrentRelationTags, currentRelationMembers []gormModel.CurrentRelationMembers, relationMembers []gormModel.RelationMembers, oldRelationTags []gormModel.RelationTags) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	err := tx.Model(&gormModel.CurrentRelations{}).Create(currentRelation).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, currentRelationTag := range currentRelationTags {
+		currentRelationTag.RelationId = currentRelation.ID
+		err = tx.Model(&gormModel.CurrentRelationTags{}).Create(currentRelationTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	for _, currentRelationMember := range currentRelationMembers {
+		currentRelationMember.RelationId = currentRelation.ID
+		err = tx.Model(&gormModel.CurrentRelationMembers{}).Create(currentRelationMember).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	oldRelation.RelationId = currentRelation.ID
+	err = tx.Model(&gormModel.Relations{}).Create(oldRelation).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, oldRelationTag := range oldRelationTags {
+		oldRelationTag.RelationId = currentRelation.ID
+
+		err = tx.Model(&gormModel.RelationTags{}).Create(oldRelationTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	for _, oldRelationMember := range relationMembers {
+		oldRelationMember.RelationId = currentRelation.ID
+		err = tx.Model(&gormModel.RelationMembers{}).Create(oldRelationMember).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return nil
+}
+
+func ModifyRelation(id int64, relationModify map[string]interface{}, oldRelation gormModel.Relations, currentRelationTags []gormModel.CurrentRelationTags, oldRelationTags []gormModel.RelationTags, currentRelationMembers []gormModel.CurrentRelationMembers, relationMembers []gormModel.RelationMembers) error {
+	return modifyRelation(client.DatabaseClients.GetMasterConnection(), id, relationModify, oldRelation, currentRelationTags, oldRelationTags, currentRelationMembers, relationMembers)
+}
+
+func modifyRelation(client *gorm.DB, relationId int64, relationModify map[string]interface{}, oldRelation gormModel.Relations, currentRelationTags []gormModel.CurrentRelationTags, oldRelationTags []gormModel.RelationTags, currentRelationMembers []gormModel.CurrentRelationMembers, relationMembers []gormModel.RelationMembers) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	err := client.Model(gormModel.CurrentRelations{}).Where("id = ?", relationId).Updates(relationModify).Error
+	if err != nil {
+		return err
+	}
+
+	// delete currentRelationTags
+	if err := tx.Where("relation_id = ?", relationId).Delete(&gormModel.CurrentRelationTags{}).Error; err != nil {
+		return err
+	}
+
+	for _, currentRelationTag := range currentRelationTags {
+		err = tx.Model(&gormModel.CurrentRelationTags{}).Create(currentRelationTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Where("relation_id = ?", relationId).Delete(&gormModel.CurrentRelationMembers{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, currentRelationMember := range currentRelationMembers {
+		err = tx.Model(&gormModel.CurrentRelationMembers{}).Create(currentRelationMember).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	err = tx.Model(&gormModel.Relations{}).Create(oldRelation).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, oldRelationTag := range oldRelationTags {
+		err = tx.Model(&gormModel.RelationTags{}).Create(oldRelationTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	for _, relationMember := range relationMembers {
+		err = tx.Model(&gormModel.RelationMembers{}).Create(relationMember).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return nil
 }

@@ -562,3 +562,18 @@ func getDetailedRelationsByIDs(db *gorm.DB, relationIDs []int64) ([]gormModel.Cu
 
 	return results, nil
 }
+
+func GetCurrentRelationById(id int64) (gormModel.CurrentRelations, error) {
+	return getCurrentRelationById(dbClient.DatabaseClients.GetMasterConnection(), id)
+}
+
+func getCurrentRelationById(client *gorm.DB, id int64) (gormModel.CurrentRelations, error) {
+
+	var currentRelations gormModel.CurrentRelations
+
+	err := client.Model(&currentRelations).Where("id = ?", id).First(&currentRelations).Error
+	if err != nil {
+		return gormModel.CurrentRelations{}, err
+	}
+	return currentRelations, nil
+}
