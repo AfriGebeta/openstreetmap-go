@@ -71,15 +71,22 @@ type Tag struct {
 
 type UploadChangesetResult struct {
 	Node []UploadChangesetNode `xml:"node"`
+	Way  []UploadChangesetWay  `xml:"way"`
+}
+
+type UploadChangesetWay struct {
+	OldId      int64 `xml:"old_id,attr"`
+	NewId      int64 `xml:"new_id,attr"`
+	NewVersion int64 `xml:"new_version,attr"`
 }
 
 type UploadChangesetNode struct {
-	Id      int64  `xml:"id,attr"`
-	OldId   int64  `xml:"old_id,attr"`
-	Version int    `xml:"version,attr,omitempty"`
-	Lat     int    `xml:"lat,attr,omitempty"`
-	Lon     int    `xml:"long,attr,omitempty"`
-	Action  string `xml:"action,attr,omitempty"`
+	Id         int64  `xml:"new_id,attr"`
+	OldId      int64  `xml:"old_id,attr"`
+	NewVersion int    `xml:"new_version,attr,omitempty"`
+	Lat        int    `xml:"lat,attr,omitempty"`
+	Lon        int    `xml:"long,attr,omitempty"`
+	Action     string `xml:"action,attr,omitempty"`
 }
 
 type DiffResult struct {

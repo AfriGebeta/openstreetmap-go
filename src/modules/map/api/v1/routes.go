@@ -60,7 +60,7 @@ func GetMap(w http.ResponseWriter, r *http.Request) error {
 			nodeMaps[node.ID] = node
 		}
 		// Note: step 2 Get the current way nodes from tha current nodes to get the current_ways
-		currentWaysNodes, err := repository3.FetchCurrentWayNodes(currentNodeIds)
+		currentWaysNodes, err := repository3.GetCurrentWayNodes(currentNodeIds)
 		if err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func GetMap(w http.ResponseWriter, r *http.Request) error {
 			wayMaps[way.ID] = way
 		}
 		// Note: step 4 Get the current Nodes using way ids
-		currentWayNodesByWayIds, err := repository3.FetchCurrentWayNodesByWaysIds(wayIds)
+		currentWayNodesByWayIds, err := repository3.GetCurrentWayNodesByWaysIds(wayIds)
 		if err != nil {
 			return err
 		}

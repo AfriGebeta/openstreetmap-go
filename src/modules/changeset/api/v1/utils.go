@@ -5,12 +5,21 @@ import (
 	"errors"
 	gormModel "openstreetmap-go/src/db/generated/gorm"
 	repository3 "openstreetmap-go/src/modules/changeset/repository"
-	"openstreetmap-go/src/modules/current_node_tags/repository"
 	"openstreetmap-go/src/modules/current_nodes/respository"
+	"openstreetmap-go/src/modules/current_way_nodes/repository"
 	"openstreetmap-go/src/utils/geo"
 	"strconv"
 	"time"
 )
+
+func findNodeIdFromUploadChangesetResult(id int64, Nodes []UploadChangesetNode) int64 {
+	for _, uploadChangesetNode := range Nodes {
+		if uploadChangesetNode.OldId == id {
+			return uploadChangesetNode.Id
+		}
+	}
+	return -1
+}
 
 func buildDiffResultXml(results UploadChangesetResult) (string, error) {
 	diffResult := DiffResult{
@@ -34,8 +43,8 @@ func buildDiffResultXml(results UploadChangesetResult) (string, error) {
 
 		//nodeDiff.OldID = utils.PtrOf(node.Id)
 
-		if node.Version > 0 {
-			nodeDiff.NewVersion = node.Version
+		if node.NewVersion > 0 {
+			nodeDiff.NewVersion = node.NewVersion
 		}
 
 		diffResult.Nodes = append(diffResult.Nodes, nodeDiff)
@@ -83,8 +92,7 @@ func ProcessModifyElement(changesetId int64, element Elements, uploadResult *Upl
 
 	return nil
 }
-func ProcessCreateElement(changesetId int64, element Elements, uploadResult *UploadChangesetResult) error {
-
+func ProcessCreateElement(changesetId int64, osm OsmChange, changeset gormModel.Changesets, userId int64, element Elements, uploadResult *UploadChangesetResult) error {
 	if len(element.Nodes) != 0 {
 		err := processCreateNodeElement(changesetId, element.Nodes, uploadResult)
 		if err != nil {
@@ -103,6 +111,7 @@ func ProcessCreateElement(changesetId int64, element Elements, uploadResult *Upl
 	return nil
 }
 
+// process
 func processModifyNodeElement(changesetId int64, element []Node, uploadResult *UploadChangesetResult) error {
 	for _, node := range element {
 
@@ -120,6 +129,10 @@ func processModifyNodeElement(changesetId int64, element []Node, uploadResult *U
 			return err
 		}
 
+		if int64(node.Version) != currentNode.Version {
+			return errors.New("invalid version")
+		}
+
 		data := make(map[interface{}]interface{})
 		data["changeset_id"] = changesetId
 		data["version"] = node.Version + 1
@@ -133,16 +146,6 @@ func processModifyNodeElement(changesetId int64, element []Node, uploadResult *U
 			data["tile"] = tile
 		}
 
-		err = respository.UpdateCurrentNode(strconv.FormatInt(currentNode.ID, 10), data)
-		if err != nil {
-			return err
-		}
-
-		err = repository.DeleteCurrentNodeTags(strconv.FormatInt(currentNode.ID, 10))
-		if err != nil {
-			return err
-		}
-
 		oldNode := gormModel.Nodes{
 			Latitude:    int(node.Lat * 1e7),
 			Longitude:   int(node.Lon * 1e7),
@@ -150,7 +153,7 @@ func processModifyNodeElement(changesetId int64, element []Node, uploadResult *U
 			Visible:     true,
 			Timestamp:   time.Now(),
 			Tile:        tile,
-			Version:     int64(node.Version),
+			Version:     int64(node.Version) + 1,
 		}
 
 		oldNodeTags := make([]gormModel.NodeTags, 0)
@@ -167,7 +170,7 @@ func processModifyNodeElement(changesetId int64, element []Node, uploadResult *U
 			oldNodeTags = append(oldNodeTags, gormModel.NodeTags{
 				K:       tag.Key,
 				V:       tag.Value,
-				Version: int64(node.Version),
+				Version: int64(node.Version) + 1,
 			})
 		}
 		err = repository3.ModifyNode(strconv.FormatInt(currentNode.ID, 10), data, &oldNode, currentNodeTags, oldNodeTags)
@@ -176,12 +179,12 @@ func processModifyNodeElement(changesetId int64, element []Node, uploadResult *U
 		}
 
 		uploadResult.Node = append(uploadResult.Node, UploadChangesetNode{
-			Id:      currentNode.ID,
-			OldId:   currentNode.ID,
-			Version: node.Version,
-			Lat:     int(node.Lat * 1e7),
-			Lon:     int(node.Lon * 1e7),
-			Action:  "modify",
+			Id:         currentNode.ID,
+			OldId:      currentNode.ID,
+			NewVersion: node.Version + 1,
+			Lat:        int(node.Lat * 1e7),
+			Lon:        int(node.Lon * 1e7),
+			Action:     "modify",
 		})
 
 	}
@@ -189,6 +192,7 @@ func processModifyNodeElement(changesetId int64, element []Node, uploadResult *U
 	return nil
 }
 func processCreateNodeElement(changesetId int64, element []Node, uploadChangesetResult *UploadChangesetResult) error {
+
 	for _, node := range element {
 
 		if node.Changeset != changesetId {
@@ -206,7 +210,7 @@ func processCreateNodeElement(changesetId int64, element []Node, uploadChangeset
 			Visible:     true,
 			Timestamp:   time.Now(),
 			Tile:        tile,
-			Version:     int64(node.Version),
+			Version:     int64(node.Version) + 1,
 		}
 
 		oldNode := gormModel.Nodes{
@@ -216,7 +220,7 @@ func processCreateNodeElement(changesetId int64, element []Node, uploadChangeset
 			Visible:     true,
 			Timestamp:   time.Now(),
 			Tile:        tile,
-			Version:     int64(node.Version),
+			Version:     int64(node.Version) + 1,
 		}
 
 		oldNodeTags := make([]gormModel.NodeTags, 0)
@@ -233,28 +237,29 @@ func processCreateNodeElement(changesetId int64, element []Node, uploadChangeset
 			oldNodeTags = append(oldNodeTags, gormModel.NodeTags{
 				K:       tag.Key,
 				V:       tag.Value,
-				Version: int64(node.Version),
+				Version: int64(node.Version) + 1,
 			})
 		}
 
-		err := repository3.CreateNewNode(&currentNode, &oldNode, currentNodeTags, oldNodeTags)
+		err := repository3.InsertNode(&currentNode, &oldNode, currentNodeTags, oldNodeTags)
 		if err != nil {
 			return err
 		}
 
 		uploadChangesetResult.Node = append(uploadChangesetResult.Node, UploadChangesetNode{
-			Id:      currentNode.ID,
-			OldId:   node.ID,
-			Version: node.Version,
-			Lat:     int(node.Lat * 1e7),
-			Lon:     int(node.Lon * 1e7),
-			Action:  "create",
+			Id:         currentNode.ID,
+			OldId:      node.ID,
+			NewVersion: node.Version + 1,
+			Lat:        int(node.Lat * 1e7),
+			Lon:        int(node.Lon * 1e7),
+			Action:     "create",
 		})
 
 	}
 
 	return nil
 }
+
 func processDeleteNodeElement(changesetId int64, element []Node, uploadChangesetResult *UploadChangesetResult) error {
 	for _, node := range element {
 
@@ -304,21 +309,198 @@ func processDeleteNodeElement(changesetId int64, element []Node, uploadChangeset
 			})
 		}
 
-		err := repository3.CreateNewNode(&currentNode, &oldNode, currentNodeTags, oldNodeTags)
+		err := repository3.InsertNode(&currentNode, &oldNode, currentNodeTags, oldNodeTags)
 		if err != nil {
 			return err
 		}
 
 		uploadChangesetResult.Node = append(uploadChangesetResult.Node, UploadChangesetNode{
-			Id:      currentNode.ID,
-			OldId:   node.ID,
-			Version: node.Version,
-			Lat:     int(node.Lat * 1e7),
-			Lon:     int(node.Lon * 1e7),
-			Action:  "create",
+			Id:         currentNode.ID,
+			OldId:      node.ID,
+			NewVersion: node.Version,
+			Lat:        int(node.Lat * 1e7),
+			Lon:        int(node.Lon * 1e7),
+			Action:     "create",
 		})
 
 	}
 
+	return nil
+}
+
+func processCreateWayElement(changesetId int64, element []Way, uploadChangesetResult *UploadChangesetResult) error {
+	for _, way := range element {
+
+		if way.Changeset != changesetId {
+			return errors.New("invalid id")
+		}
+
+		currentWay := gormModel.CurrentWays{
+			ChangesetId: changesetId,
+			Visible:     true,
+			Timestamp:   time.Now(),
+			Version:     int64(way.Version) + 1,
+		}
+
+		oldway := gormModel.Ways{
+			ChangesetId: changesetId,
+			Visible:     true,
+			Timestamp:   time.Now(),
+			Version:     int64(way.Version) + 1,
+		}
+
+		currentWayTags := make([]gormModel.CurrentWayTags, 0)
+		oldWayTags := make([]gormModel.WayTags, 0)
+
+		for _, tag := range way.Tags {
+			currentWayTags = append(currentWayTags, gormModel.CurrentWayTags{
+				K: tag.Key,
+				V: tag.Value,
+			})
+			oldWayTags = append(oldWayTags, gormModel.WayTags{
+				K:       tag.Key,
+				V:       tag.Value,
+				Version: int64(way.Version) + 1,
+			})
+		}
+
+		currentWayNodes := make([]gormModel.CurrentWayNodes, 0)
+		oldWayNodes := make([]gormModel.WayNodes, 0)
+
+		for index, nd := range way.NDs {
+			nodeId := findNodeIdFromUploadChangesetResult(nd.Ref, uploadChangesetResult.Node)
+			if nodeId < 0 {
+				return errors.New("invalid id")
+			}
+
+			if nd.Ref < 0 {
+				currentWayNodes = append(currentWayNodes, gormModel.CurrentWayNodes{
+					SequenceId: int64(index),
+					NodeId:     nodeId,
+				})
+				oldWayNodes = append(oldWayNodes, gormModel.WayNodes{
+					SequenceId: int64(index),
+					NodeId:     nodeId,
+				})
+			} else {
+				currentWayNodes = append(currentWayNodes, gormModel.CurrentWayNodes{
+					SequenceId: int64(index),
+					NodeId:     nodeId,
+				})
+				oldWayNodes = append(oldWayNodes, gormModel.WayNodes{
+					SequenceId: int64(index),
+					NodeId:     nodeId,
+				})
+			}
+		}
+
+		err := repository3.InsertWays(&currentWay, currentWayNodes, currentWayTags, oldway, oldWayNodes, oldWayTags)
+		if err != nil {
+			return err
+		}
+
+		uploadChangesetResult.Way = append(uploadChangesetResult.Way, UploadChangesetWay{
+			NewId:      currentWay.ID,
+			OldId:      way.ID,
+			NewVersion: int64(way.Version + 1),
+		})
+
+	}
+
+	return nil
+}
+
+func processModifyWayElement(changesetId int64, element []Way, uploadChangesetResult *UploadChangesetResult) error {
+
+	for _, way := range element {
+		if way.Changeset != changesetId {
+			return errors.New("invalid id")
+		}
+		wayModify := map[string]interface{}{}
+		wayModify["changeset_id"] = changesetId
+		wayModify["timestamp"] = time.Now()
+		wayModify["version"] = int64(way.Version) + 1
+
+		oldway := gormModel.Ways{
+			ChangesetId: changesetId,
+			Visible:     true,
+			Timestamp:   time.Now(),
+			Version:     int64(way.Version) + 1,
+		}
+
+		currentWayTags := make([]gormModel.CurrentWayTags, 0)
+		oldWayTags := make([]gormModel.WayTags, 0)
+
+		for _, tag := range way.Tags {
+			currentWayTags = append(currentWayTags, gormModel.CurrentWayTags{
+				K: tag.Key,
+				V: tag.Value,
+			})
+			oldWayTags = append(oldWayTags, gormModel.WayTags{
+				K:       tag.Key,
+				V:       tag.Value,
+				Version: int64(way.Version) + 1,
+			})
+		}
+
+		// get the way nodes
+		wayNodes, err := repository.GetCurrentWayNodesByWayId(way.ID)
+		if err != nil {
+			return err
+		}
+
+		currentWayNodes := make([]gormModel.CurrentWayNodes, 0)
+		oldWayNodes := make([]gormModel.WayNodes, 0)
+
+		for index, nd := range way.NDs {
+			for _, wayNode := range wayNodes {
+				if wayNode.NodeId == nd.Ref {
+					if nd.Ref < 0 {
+						nodeId := findNodeIdFromUploadChangesetResult(nd.Ref, uploadChangesetResult.Node)
+						if nodeId < 0 {
+							return errors.New("invalid id")
+						}
+						currentWayNodes = append(currentWayNodes, gormModel.CurrentWayNodes{
+							SequenceId: int64(index),
+							WayId:      way.ID,
+							NodeId:     nodeId,
+						})
+						oldWayNodes = append(oldWayNodes, gormModel.WayNodes{
+							SequenceId: int64(index),
+							WayId:      way.ID,
+							NodeId:     nodeId,
+							Version:    int64(way.Version) + 1,
+						})
+					} else {
+						currentWayNodes = append(currentWayNodes, gormModel.CurrentWayNodes{
+							SequenceId: int64(index),
+							WayId:      way.ID,
+							NodeId:     wayNode.NodeId,
+						})
+						oldWayNodes = append(oldWayNodes, gormModel.WayNodes{
+							SequenceId: int64(index),
+							WayId:      way.ID,
+							NodeId:     wayNode.NodeId,
+							Version:    int64(way.Version) + 1,
+						})
+					}
+
+				}
+			}
+
+		}
+
+		err = repository3.ModifyWay(way.ID, wayModify, currentWayNodes, currentWayTags, oldway, oldWayNodes, oldWayTags)
+		if err != nil {
+			return err
+		}
+
+		uploadChangesetResult.Way = append(uploadChangesetResult.Way, UploadChangesetWay{
+			NewId:      way.ID,
+			OldId:      way.ID,
+			NewVersion: int64(way.Version + 1),
+		})
+
+	}
 	return nil
 }

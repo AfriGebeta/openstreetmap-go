@@ -16,14 +16,81 @@ func CloseChangeSetById(id int64) error {
 	return closeChangeSetById(client.DatabaseClients.GetMasterConnection(), id)
 }
 
+func InsertWays(currentWays *gormModel.CurrentWays, currentWayNodes []gormModel.CurrentWayNodes, currentWayTags []gormModel.CurrentWayTags, oldway gormModel.Ways, oldWayNodes []gormModel.WayNodes, oldWayTags []gormModel.WayTags) error {
+	return insertWays(client.DatabaseClients.GetMasterConnection(), currentWays, currentWayNodes, currentWayTags, oldway, oldWayNodes, oldWayTags)
+}
+
 func InsertIntoChangeset(changeset *gormModel.Changesets, changesetTags []gormModel.ChangesetTags, changesetSubscribers gormModel.ChangesetsSubscribers) (gormModel.Changesets, error) {
 	return insertIntoChangeset(client.DatabaseClients.GetMasterConnection(), changeset, changesetTags, changesetSubscribers)
 }
-func CreateNewNode(currentNode *gormModel.CurrentNodes, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
-	return createNewNode(client.DatabaseClients.GetMasterConnection(), currentNode, nodes, currentNodeTags, nodeTags)
+func InsertNode(currentNode *gormModel.CurrentNodes, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
+	return insertNode(client.DatabaseClients.GetMasterConnection(), currentNode, nodes, currentNodeTags, nodeTags)
 }
+
 func ModifyNode(nodeId string, data map[interface{}]interface{}, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
 	return modifyNode(client.DatabaseClients.GetMasterConnection(), nodeId, data, nodes, currentNodeTags, nodeTags)
+}
+
+func UpdateChangeset(id string, data map[interface{}]interface{}) error {
+	return updateChangeset(client.DatabaseClients.GetMasterConnection(), id, data)
+}
+
+func insertWays(client *gorm.DB, currentWays *gormModel.CurrentWays, currentWayNodes []gormModel.CurrentWayNodes, currentWayTags []gormModel.CurrentWayTags, oldway gormModel.Ways, oldWayNodes []gormModel.WayNodes, oldWayTags []gormModel.WayTags) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	err := tx.Model(&gormModel.CurrentWays{}).Create(currentWays).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, currentWayTag := range currentWayTags {
+		err = tx.Model(&gormModel.CurrentWayTags{}).Create(currentWayTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	for _, currentWayNode := range currentWayNodes {
+		currentWayNode.WayId = currentWays.ID
+		err = tx.Model(&gormModel.CurrentWayNodes{}).Create(currentWayNode).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	oldway.WayId = currentWays.ID
+	err = tx.Model(&gormModel.Ways{}).Create(oldway).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, oldwayTag := range oldWayTags {
+		oldwayTag.WayId = currentWays.ID
+		err = tx.Model(&gormModel.WayTags{}).Create(oldwayTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	for _, oldWayNode := range oldWayNodes {
+		oldWayNode.WayId = currentWays.ID
+		err = tx.Model(&gormModel.WayNodes{}).Create(oldWayNode).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return nil
 }
 
 func modifyNode(client *gorm.DB, nodeId string, data map[interface{}]interface{}, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
@@ -32,8 +99,12 @@ func modifyNode(client *gorm.DB, nodeId string, data map[interface{}]interface{}
 		return tx.Error
 	}
 
-	err := client.Model(gormModel.CurrentNodes{}).Where("id = ?", nodeId).Updates(data).Error
+	err := tx.Model(gormModel.CurrentNodes{}).Where("id = ?", nodeId).Updates(data).Error
 	if err != nil {
+		return err
+	}
+
+	if err := tx.Where("node_id = ?", nodeId).Delete(&gormModel.NodeTags{}).Error; err != nil {
 		return err
 	}
 
@@ -43,11 +114,12 @@ func modifyNode(client *gorm.DB, nodeId string, data map[interface{}]interface{}
 	}
 	nodes.NodeId = nodeIdInt
 
-	err = client.Model(&gormModel.Nodes{}).Create(&nodes).Error
+	err = tx.Model(&gormModel.Nodes{}).Create(&nodes).Error
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
+
 	for _, nodeTag := range nodeTags {
 		nodeTag.NodeId = nodeIdInt
 		err = tx.Model(&gormModel.NodeTags{}).Create(nodeTag).Error
@@ -56,21 +128,29 @@ func modifyNode(client *gorm.DB, nodeId string, data map[interface{}]interface{}
 			return err
 		}
 	}
-
-	for _, currentNodeTag := range currentNodeTags {
-		currentNodeTag.NodeId = nodeIdInt
-		err = tx.Model(&gormModel.CurrentNodeTags{}).Create(currentNodeTag).Error
-		if err != nil {
+	if len(currentNodeTags) > 0 {
+		if err = tx.Where("node_id = ?", nodeId).Delete(&gormModel.CurrentNodeTags{}).Error; err != nil {
 			tx.Rollback()
 			return err
 		}
+
+		for _, currentNodeTag := range currentNodeTags {
+			currentNodeTag.NodeId = nodeIdInt
+			err = tx.Model(&gormModel.CurrentNodeTags{}).Create(currentNodeTag).Error
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
 	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	return nil
 
-}
-
-func UpdateChangeset(id string, data map[interface{}]interface{}) error {
-	return updateChangeset(client.DatabaseClients.GetMasterConnection(), id, data)
 }
 
 func updateChangeset(client *gorm.DB, id string, data map[interface{}]interface{}) error {
@@ -81,7 +161,7 @@ func updateChangeset(client *gorm.DB, id string, data map[interface{}]interface{
 	return nil
 }
 
-func createNewNode(client *gorm.DB, currentNode *gormModel.CurrentNodes, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
+func insertNode(client *gorm.DB, currentNode *gormModel.CurrentNodes, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
 	tx := client.Begin()
 	if tx.Error != nil {
 		return tx.Error
@@ -94,7 +174,7 @@ func createNewNode(client *gorm.DB, currentNode *gormModel.CurrentNodes, nodes *
 	}
 
 	nodes.NodeId = currentNode.ID
-	err = client.Model(&gormModel.Nodes{}).Create(&nodes).Error
+	err = tx.Model(&gormModel.Nodes{}).Create(&nodes).Error
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -115,6 +195,11 @@ func createNewNode(client *gorm.DB, currentNode *gormModel.CurrentNodes, nodes *
 			tx.Rollback()
 			return err
 		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
 	}
 	return nil
 }
@@ -166,4 +251,84 @@ func getChangeSetById(client *gorm.DB, id int64) (gormModel.Changesets, error) {
 		return gormModel.Changesets{}, err
 	}
 	return changeset, nil
+}
+
+func ModifyWay(wayId int64, wayModify map[string]interface{}, currentWayNodes []gormModel.CurrentWayNodes, currentWayTags []gormModel.CurrentWayTags, oldway gormModel.Ways, oldWayNodes []gormModel.WayNodes, oldWayTags []gormModel.WayTags) error {
+	return modifyWay(client.DatabaseClients.GetMasterConnection(),
+		wayId,
+		wayModify,
+		currentWayNodes,
+		currentWayTags,
+		oldway,
+		oldWayNodes,
+		oldWayTags)
+}
+
+func modifyWay(client *gorm.DB, wayId int64, wayModify map[string]interface{}, currentWayNodes []gormModel.CurrentWayNodes, currentWayTags []gormModel.CurrentWayTags, oldway gormModel.Ways, oldWayNodes []gormModel.WayNodes, oldWayTags []gormModel.WayTags) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	err := client.Model(gormModel.CurrentWays{}).Where("id = ?", wayId).Updates(wayModify).Error
+	if err != nil {
+		return err
+	}
+
+	// delete the current way tags
+	if err := tx.Where("node_id = ?", wayId).Delete(&gormModel.CurrentWayTags{}).Error; err != nil {
+		return err
+	}
+
+	for _, currentWayTag := range currentWayTags {
+		err = tx.Model(&gormModel.CurrentWayTags{}).Create(currentWayTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Where("way_id = ?", wayId).Delete(&gormModel.CurrentWayNodes{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, currentWayNode := range currentWayNodes {
+		err = tx.Model(&gormModel.CurrentWayNodes{}).Create(currentWayNode).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	oldway.WayId = wayId
+	err = tx.Model(&gormModel.Ways{}).Create(oldway).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, oldwayTag := range oldWayTags {
+		oldwayTag.WayId = wayId
+		err = tx.Model(&gormModel.WayTags{}).Create(oldwayTag).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	for _, oldWayNode := range oldWayNodes {
+		oldWayNode.WayId = wayId
+		err = tx.Model(&gormModel.WayNodes{}).Create(oldWayNode).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return nil
+
 }

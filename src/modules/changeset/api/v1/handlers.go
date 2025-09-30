@@ -222,7 +222,7 @@ func upload(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	var uploadResult UploadChangesetResult
-	err = ProcessCreateElement(changesetIdInt64, osm.Create, &uploadResult)
+	err = ProcessCreateElement(changesetIdInt64, osm, changeSet, *oat.ResourceOwnerId, osm.Create, &uploadResult)
 	if err != nil {
 		return err
 	}
