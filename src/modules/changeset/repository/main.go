@@ -27,6 +27,10 @@ func InsertNode(currentNode *gormModel.CurrentNodes, nodes *gormModel.Nodes, cur
 	return insertNode(client.DatabaseClients.GetMasterConnection(), currentNode, nodes, currentNodeTags, nodeTags)
 }
 
+func DeleteNode(nodeId int64, data map[string]interface{}, nodes *gormModel.Nodes) error {
+	return deleteNode(client.DatabaseClients.GetMasterConnection(), nodeId, data, nodes)
+}
+
 func ModifyNode(nodeId string, data map[interface{}]interface{}, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
 	return modifyNode(client.DatabaseClients.GetMasterConnection(), nodeId, data, nodes, currentNodeTags, nodeTags)
 }
@@ -161,6 +165,34 @@ func updateChangeset(client *gorm.DB, id string, data map[interface{}]interface{
 	return nil
 }
 
+func deleteNode(client *gorm.DB, nodeId int64, data map[string]interface{}, nodes *gormModel.Nodes) error {
+	tx := client.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	err := tx.Model(gormModel.CurrentNodes{}).Where("id = ?", nodeId).Updates(data).Error
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Where("node_id = ?", nodeId).Delete(&gormModel.CurrentWayTags{}).Error; err != nil {
+		return err
+	}
+
+	err = tx.Model(&gormModel.Nodes{}).Create(&nodes).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return nil
+}
+
 func insertNode(client *gorm.DB, currentNode *gormModel.CurrentNodes, nodes *gormModel.Nodes, currentNodeTags []gormModel.CurrentNodeTags, nodeTags []gormModel.NodeTags) error {
 	tx := client.Begin()
 	if tx.Error != nil {
@@ -276,7 +308,7 @@ func modifyWay(client *gorm.DB, wayId int64, wayModify map[string]interface{}, c
 	}
 
 	// delete the current way tags
-	if err := tx.Where("node_id = ?", wayId).Delete(&gormModel.CurrentWayTags{}).Error; err != nil {
+	if err := tx.Where("way_id = ?", wayId).Delete(&gormModel.CurrentWayTags{}).Error; err != nil {
 		return err
 	}
 

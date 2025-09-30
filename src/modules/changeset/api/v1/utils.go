@@ -61,7 +61,7 @@ func buildDiffResultXml(results UploadChangesetResult) (string, error) {
 
 func ProcessDeleteElement(changesetId int64, element Elements, uploadResult *UploadChangesetResult) error {
 	if len(element.Nodes) != 0 {
-		return nil
+		return processDeleteNodeElement(changesetId, element.Nodes, uploadResult)
 	}
 
 	if len(element.Ways) != 0 {
@@ -111,7 +111,6 @@ func ProcessCreateElement(changesetId int64, osm OsmChange, changeset gormModel.
 	return nil
 }
 
-// process
 func processModifyNodeElement(changesetId int64, element []Node, uploadResult *UploadChangesetResult) error {
 	for _, node := range element {
 
@@ -266,61 +265,36 @@ func processDeleteNodeElement(changesetId int64, element []Node, uploadChangeset
 		if node.Changeset != changesetId {
 			return errors.New("invalid id")
 		}
-
-		x := geo.Lon2x(node.Lon)
-		y := geo.Lon2x(node.Lat)
-		tile := int64(geo.XY2Tile(x, y))
-
-		currentNode := gormModel.CurrentNodes{
-			Latitude:    int(node.Lat * 1e7),
-			Longitude:   int(node.Lon * 1e7),
-			ChangesetId: changesetId,
-			Visible:     true,
-			Timestamp:   time.Now(),
-			Tile:        tile,
-			Version:     int64(node.Version),
+		currentNode, err := respository.GetCurrentNodeById(node.ID)
+		if err != nil {
+			return err
 		}
+
+		// check if the node exists
+		var data map[string]interface{}
+		data["changeset_id"] = changesetId
+		data["visible"] = false
+		data["version"] = currentNode.Version + 1
+		data["timestamp"] = time.Now()
 
 		oldNode := gormModel.Nodes{
-			Latitude:    int(node.Lat * 1e7),
-			Longitude:   int(node.Lon * 1e7),
+			Latitude:    int(currentNode.Latitude * 1e7),
+			Longitude:   int(currentNode.Longitude * 1e7),
 			ChangesetId: changesetId,
 			Visible:     true,
 			Timestamp:   time.Now(),
-			Tile:        tile,
-			Version:     int64(node.Version),
+			Tile:        currentNode.Tile,
+			Version:     int64(currentNode.Version) + 1,
 		}
 
-		oldNodeTags := make([]gormModel.NodeTags, 0)
-		currentNodeTags := make([]gormModel.CurrentNodeTags, 0)
-		for _, tag := range node.Tags {
-			currentNodeTags = append(currentNodeTags, gormModel.CurrentNodeTags{
-				K: tag.Key,
-				V: tag.Value,
-			})
-
-		}
-
-		for _, tag := range node.Tags {
-			oldNodeTags = append(oldNodeTags, gormModel.NodeTags{
-				K:       tag.Key,
-				V:       tag.Value,
-				Version: int64(node.Version),
-			})
-		}
-
-		err := repository3.InsertNode(&currentNode, &oldNode, currentNodeTags, oldNodeTags)
+		err = repository3.DeleteNode(node.ID, data, &oldNode)
 		if err != nil {
 			return err
 		}
 
 		uploadChangesetResult.Node = append(uploadChangesetResult.Node, UploadChangesetNode{
-			Id:         currentNode.ID,
-			OldId:      node.ID,
-			NewVersion: node.Version,
-			Lat:        int(node.Lat * 1e7),
-			Lon:        int(node.Lon * 1e7),
-			Action:     "create",
+			OldId:  node.ID,
+			Action: "delete",
 		})
 
 	}

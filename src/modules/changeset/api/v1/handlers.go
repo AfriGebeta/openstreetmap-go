@@ -289,3 +289,35 @@ func upload(w http.ResponseWriter, r *http.Request) error {
 	}
 	return nil
 }
+
+func createComment(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func unsubscribeToChangeset(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func subscribeToChangeset(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func downloadChangeset(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func updateChangeSet(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func getChangesetById(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func createChangeset(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func getChangesets(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
