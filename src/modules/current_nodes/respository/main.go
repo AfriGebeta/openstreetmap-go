@@ -13,7 +13,7 @@ func CreateCurrentNode(currentNode *gormModel.CurrentNodes) error {
 	return createCurrentNode(dbClient.DatabaseClients.GetMasterConnection(), currentNode)
 }
 func GetCurrentNodeInBBox(bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
-	return fetchCurrentNodeInBBox(dbClient.DatabaseClients.GetRandomConnection(), bbox, tileWhereClause)
+	return getCurrentNodeInBBox(dbClient.DatabaseClients.GetRandomConnection(), bbox, tileWhereClause)
 }
 func UpdateCurrentNode(id string, data map[interface{}]interface{}) error {
 	return updateCurrentNode(dbClient.DatabaseClients.GetMasterConnection(), id, data)
@@ -48,7 +48,7 @@ func createCurrentNode(client *gorm.DB, currentNode *gormModel.CurrentNodes) err
 	return nil
 }
 
-func fetchCurrentNodeInBBox(db *gorm.DB, bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
+func getCurrentNodeInBBox(db *gorm.DB, bbox model.BBox, tileWhereClause string) ([]gormModel.CurrentNodes, error) {
 	var nodesMap = make(map[int64]*gormModel.CurrentNodes)
 	var nodes []gormModel.CurrentNodes
 

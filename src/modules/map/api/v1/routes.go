@@ -71,7 +71,7 @@ func GetMap(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		// Note: step 3 Get the current ways from the collected wayIds from currentWayNodes
-		ways, err := repository.FetchCurrentWaysByIds(currentWayIdsFromWaysNodes)
+		ways, err := repository.GetCurrentWayByIds(currentWayIdsFromWaysNodes)
 		if err != nil {
 			return err
 		}
@@ -111,13 +111,13 @@ func GetMap(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 		//Note; step 6 get the visible relation by nodes
-		relationByNodes, err := repository2.FetchRelationByVisibleNodes(visibleNodeIds)
+		relationByNodes, err := repository2.GetRelationByVisibleNodes(visibleNodeIds)
 		if err != nil {
 			return err
 		}
 
 		//Note; step 7 get the visible way by ways
-		relationByWay, err := repository2.FetchRelationByVisibleWays(visibleWayIds)
+		relationByWay, err := repository2.GetRelationByVisibleWays(visibleWayIds)
 		if err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func GetMap(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		//Note; step 8 get
-		visibleRelations, err := repository2.FetchRelationByVisibleRelations(relationIds)
+		visibleRelations, err := repository2.GetRelationByVisibleRelations(relationIds)
 		if err != nil {
 			return err
 		}
@@ -153,7 +153,7 @@ func GetMap(w http.ResponseWriter, r *http.Request) error {
 			relationIds = append(relationIds, relation.ID)
 		}
 
-		relationdata, err := repository2.FetchDetailedRelationsByIDs(relationIds)
+		relationdata, err := repository2.GetDetailedRelationsByIDs(relationIds)
 		if err != nil {
 			return err
 		}

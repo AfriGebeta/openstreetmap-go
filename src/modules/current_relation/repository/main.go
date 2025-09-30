@@ -8,24 +8,23 @@ import (
 	gormModel "openstreetmap-go/src/db/generated/gorm"
 )
 
-//Todo: change the preload to join and map the result
-
-func FetchRelationByVisibleNodes(nodeIds []int64) ([]gormModel.CurrentRelations, error) {
-	return fetchRelationByVisibleNodes(dbClient.DatabaseClients.GetMasterConnection(), nodeIds)
+func GetRelationByVisibleNodes(nodeIds []int64) ([]gormModel.CurrentRelations, error) {
+	return getRelationByVisibleNodes(dbClient.DatabaseClients.GetMasterConnection(), nodeIds)
 }
 
-func FetchRelationByVisibleWays(nodeIds []int64) ([]gormModel.CurrentRelations, error) {
-	return fetchRelationByVisibleWays(dbClient.DatabaseClients.GetMasterConnection(), nodeIds)
+func GetRelationByVisibleWays(nodeIds []int64) ([]gormModel.CurrentRelations, error) {
+	return getRelationByVisibleWays(dbClient.DatabaseClients.GetMasterConnection(), nodeIds)
 }
 
-func FetchRelationByVisibleRelations(relationIds []int64) ([]gormModel.CurrentRelations, error) {
-	return fetchRelationByVisibleRelations(dbClient.DatabaseClients.GetMasterConnection(), relationIds)
+func GetRelationByVisibleRelations(relationIds []int64) ([]gormModel.CurrentRelations, error) {
+	return getRelationByVisibleRelations(dbClient.DatabaseClients.GetMasterConnection(), relationIds)
 }
 
-func FetchDetailedRelationsByIDs(relationIDs []int64) ([]gormModel.CurrentRelations, error) {
-	return fetchDetailedRelationsByIDs(dbClient.DatabaseClients.GetMasterConnection(), relationIDs)
+func GetDetailedRelationsByIDs(relationIDs []int64) ([]gormModel.CurrentRelations, error) {
+	return getDetailedRelationsByIDs(dbClient.DatabaseClients.GetMasterConnection(), relationIDs)
 }
-func fetchRelationByVisibleNodes(db *gorm.DB, nodeIds []int64) ([]gormModel.CurrentRelations, error) {
+
+func getRelationByVisibleNodes(db *gorm.DB, nodeIds []int64) ([]gormModel.CurrentRelations, error) {
 	var relationsMap = make(map[int64]*gormModel.CurrentRelations)
 	var results []gormModel.CurrentRelations
 
@@ -159,24 +158,7 @@ func fetchRelationByVisibleNodes(db *gorm.DB, nodeIds []int64) ([]gormModel.Curr
 	return results, nil
 }
 
-//func fetchRelationByVisibleNodes(client *gorm.DB, nodeIds []int64) ([]gormModel.CurrentRelations, error) {
-//	var relations []gormModel.CurrentRelations
-//
-//	err := client.
-//		Joins("INNER JOIN current_relation_members ON current_relation_members.relation_id = current_relations.id").
-//		Preload("CurrentRelationMembers").
-//		Preload("CurrentRelationTags").
-//		Preload("Changeset.User").
-//		Where("current_relation_members.member_type = ?", "Node").
-//		Where("current_relation_members.member_id IN ?", nodeIds).
-//		Find(&relations).Error
-//	if err != nil {
-//		return nil, err
-//	}
-//	return relations, nil
-//}
-
-func fetchRelationByVisibleWays(db *gorm.DB, wayIds []int64) ([]gormModel.CurrentRelations, error) {
+func getRelationByVisibleWays(db *gorm.DB, wayIds []int64) ([]gormModel.CurrentRelations, error) {
 	var relationsMap = make(map[int64]*gormModel.CurrentRelations)
 	var results []gormModel.CurrentRelations
 
@@ -310,44 +292,7 @@ func fetchRelationByVisibleWays(db *gorm.DB, wayIds []int64) ([]gormModel.Curren
 	return results, nil
 }
 
-//func fetchRelationByVisibleWays(client *gorm.DB, nodeIds []int64) ([]gormModel.CurrentRelations, error) {
-//	var relations []gormModel.CurrentRelations
-//	query := client.Model(&gormModel.CurrentRelations{})
-//
-//	err := query.
-//		Joins("INNER JOIN current_relation_members ON current_relation_members.relation_id = current_relations.id").
-//		Preload("CurrentRelationMembers").
-//		Preload("CurrentRelationTags").
-//		Preload("Changeset.User").
-//		//Joins("LEFT OUTER JOIN changesets ON changesets.id = current_relations.changeset_id").
-//		//Joins("LEFT OUTER JOIN current_relation_tags ON current_relation_tags.relation_id = current_relations.id").
-//		//Joins("LEFT JOIN users ON changesets.user_id = users.id").
-//		Where("current_relation_members.member_type = ?", "Way").
-//		Where("current_relation_members.member_id IN ?", nodeIds).
-//		Find(&relations).Error
-//	if err != nil {
-//		return nil, err
-//	}
-//	return relations, nil
-//}
-
-//	func fetchRelationByVisibleRelations(client *gorm.DB, relationIds []int64) ([]gormModel.CurrentRelations, error) {
-//		var relations []gormModel.CurrentRelations
-//		//query := client.Model(&gormModel.CurrentRelations{})
-//		err := client.
-//			Joins("INNER JOIN current_relation_members ON current_relation_members.relation_id = current_relations.id").
-//			Preload("CurrentRelationMembers").
-//			Where("current_relation_members.member_type = ?", "Relation").
-//			Where("current_relation_members.member_id IN ?", relationIds).
-//			Where("current_relations.visible = ?", true).
-//			Find(&relations).Error
-//
-//		if err != nil {
-//			return nil, err
-//		}
-//		return relations, nil
-//	}
-func fetchRelationByVisibleRelations(db *gorm.DB, relationIds []int64) ([]gormModel.CurrentRelations, error) {
+func getRelationByVisibleRelations(db *gorm.DB, relationIds []int64) ([]gormModel.CurrentRelations, error) {
 	var relationsMap = make(map[int64]*gormModel.CurrentRelations)
 	var results []gormModel.CurrentRelations
 
@@ -482,7 +427,7 @@ func fetchRelationByVisibleRelations(db *gorm.DB, relationIds []int64) ([]gormMo
 	return results, nil
 }
 
-func fetchDetailedRelationsByIDs(db *gorm.DB, relationIDs []int64) ([]gormModel.CurrentRelations, error) {
+func getDetailedRelationsByIDs(db *gorm.DB, relationIDs []int64) ([]gormModel.CurrentRelations, error) {
 	var relationsMap = make(map[int64]*gormModel.CurrentRelations)
 	var results []gormModel.CurrentRelations
 
@@ -617,24 +562,3 @@ func fetchDetailedRelationsByIDs(db *gorm.DB, relationIDs []int64) ([]gormModel.
 
 	return results, nil
 }
-
-//func fetchDetailedRelationsByIDs(client *gorm.DB, relationIDs []int64) ([]gormModel.CurrentRelations, error) {
-//	var relations []gormModel.CurrentRelations
-//
-//	err := client.Model(&gormModel.CurrentRelations{}).
-//		Joins("INNER JOIN current_relation_members ON current_relation_members.relation_id = current_relations.id").
-//		Preload("CurrentRelationMembers").
-//		Preload("CurrentRelationTags").
-//		Preload("Changeset.User").
-//		//Joins("LEFT OUTER JOIN changesets ON changesets.id = current_relations.changeset_id").
-//		//Joins("LEFT OUTER JOIN current_relation_tags ON current_relation_tags.relation_id = current_relations.id").
-//		//Joins("LEFT JOIN users ON changesets.user_id = users.id").
-//		Where("current_relations.id IN ?", relationIDs).
-//		Where("current_relations.visible = ?", true).
-//		Find(&relations).Error
-//
-//	if err != nil {
-//		return nil, err
-//	}
-//	return relations, nil
-//}

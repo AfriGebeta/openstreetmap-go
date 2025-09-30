@@ -8,10 +8,10 @@ import (
 	gormModel "openstreetmap-go/src/db/generated/gorm"
 )
 
-func FetchCurrentWaysByIds(ids []int64) ([]gormModel.CurrentWays, error) {
-	return fetchCurrentWaysIds(dbClient.DatabaseClients.GetRandomConnection(), ids)
+func GetCurrentWayByIds(ids []int64) ([]gormModel.CurrentWays, error) {
+	return getCurrentWayByIds(dbClient.DatabaseClients.GetRandomConnection(), ids)
 }
-func fetchCurrentWaysIds(db *gorm.DB, ids []int64) ([]gormModel.CurrentWays, error) {
+func getCurrentWayByIds(db *gorm.DB, ids []int64) ([]gormModel.CurrentWays, error) {
 	var waysMap = make(map[int64]*gormModel.CurrentWays)
 	var ways []gormModel.CurrentWays
 
@@ -135,21 +135,3 @@ func fetchCurrentWaysIds(db *gorm.DB, ids []int64) ([]gormModel.CurrentWays, err
 
 	return ways, nil
 }
-
-//func fetchCurrentWaysIds(client *gorm.DB, ids []int64) ([]gormModel.CurrentWays, error) {
-//	var currentModels []gormModel.CurrentWays
-//	query := client.Model(&gormModel.CurrentWays{})
-//
-//	query = query.
-//		Joins("LEFT JOIN current_way_nodes ON current_way_nodes.way_id = current_ways.id").
-//		Joins("LEFT JOIN current_way_tags ON current_way_tags.way_id = current_ways.id").
-//		Joins("LEFT JOIN changesets ON changesets.id = current_ways.changeset_id").
-//		Joins("LEFT JOIN users ON changesets.user_id = users.id").
-//		Where("current_ways.id IN (?)", ids)
-//
-//	err := query.Find(&currentModels).Error
-//	if err != nil {
-//		return nil, err
-//	}
-//	return currentModels, err
-//}
