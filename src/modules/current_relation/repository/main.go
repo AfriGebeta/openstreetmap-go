@@ -24,6 +24,10 @@ func GetDetailedRelationsByIDs(relationIDs []int64) ([]gormModel.CurrentRelation
 	return getDetailedRelationsByIDs(dbClient.DatabaseClients.GetMasterConnection(), relationIDs)
 }
 
+func GetCurrentRelationById(id int64) (gormModel.CurrentRelations, error) {
+	return getCurrentRelationById(dbClient.DatabaseClients.GetMasterConnection(), id)
+}
+
 func getRelationByVisibleNodes(db *gorm.DB, nodeIds []int64) ([]gormModel.CurrentRelations, error) {
 	var relationsMap = make(map[int64]*gormModel.CurrentRelations)
 	var results []gormModel.CurrentRelations
@@ -561,10 +565,6 @@ func getDetailedRelationsByIDs(db *gorm.DB, relationIDs []int64) ([]gormModel.Cu
 	}
 
 	return results, nil
-}
-
-func GetCurrentRelationById(id int64) (gormModel.CurrentRelations, error) {
-	return getCurrentRelationById(dbClient.DatabaseClients.GetMasterConnection(), id)
 }
 
 func getCurrentRelationById(client *gorm.DB, id int64) (gormModel.CurrentRelations, error) {

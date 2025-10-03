@@ -1,0 +1,24 @@
+package template
+
+import (
+    "fmt"
+    "openstreetmap-go/template/components"
+)
+
+func loginPageStyle() templ.SafeCSS {
+    return templ.SafeCSS(fmt.Sprintf(
+        "background-color: yellow; padding: 0; margin: 0;",
+    ))
+}
+
+
+templ LoginPage(name string) {
+    <html style="margin: 0; padding: 0;">
+        <body style="margin: 0; padding: 0;">
+            <div style={loginPageStyle()}>
+                @components.NavBar()
+                <div>Hello, { name }</div>
+            </div>
+        </body>
+    </html>
+}

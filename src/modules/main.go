@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"github.com/a-h/templ"
 	"net/http"
 	changesetv1 "openstreetmap-go/src/modules/changeset/api/v1"
 	clientApi "openstreetmap-go/src/modules/client/api/v1"
@@ -8,17 +9,28 @@ import (
 	mapApiV1 "openstreetmap-go/src/modules/map/api/v1"
 	oauth2Api "openstreetmap-go/src/modules/oauth2/api/v1"
 	user "openstreetmap-go/src/modules/user/api/v1"
+	"openstreetmap-go/template"
 )
 
 func SetupApiRoutes() *http.ServeMux {
 	var router = http.NewServeMux()
+	router.Handle("/", Setup_uiRoutes())
 	router.Handle("/api/", http.StripPrefix("/api", setupVersion1()))
+
 	return router
 }
 
 func setupVersion1() *http.ServeMux {
 	var router = http.NewServeMux()
 	router.Handle("/0.6/", http.StripPrefix("/0.6", Setup0_6Routes()))
+	return router
+}
+
+func Setup_uiRoutes() *http.ServeMux {
+	var router = http.NewServeMux()
+
+	component := template.LoginPage("login page")
+	router.Handle("/login", templ.Handler(component))
 	return router
 }
 

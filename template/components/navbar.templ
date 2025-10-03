@@ -1,0 +1,13 @@
+package components
+
+func navBar() templ.SafeCSS {
+    return templ.SafeCSS(fmt.Sprintf(
+        "background-color : red",
+
+    ))
+}
+
+templ NavBar() {
+    <div style={ navBar() }>
+    This is navbar</div>
+}
